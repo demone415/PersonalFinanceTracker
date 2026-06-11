@@ -1,0 +1,136 @@
+# ============================================================
+#  Finance Tracker — .gitignore
+# ============================================================
+
+# ------------------------------------------------------------
+#  Secrets / local configuration  (НИКОГДА не коммитим)
+# ------------------------------------------------------------
+# Environment files
+.env
+.env.*
+!.env.example
+*.env
+
+# ASP.NET secret-bearing configs (базовый appsettings.json — коммитим)
+appsettings.Development.json
+appsettings.Local.json
+appsettings.Production.json
+appsettings.*.local.json
+secrets.json
+**/secrets.json
+
+# Frontend env
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Certificates / keys
+*.pfx
+*.p12
+*.key
+*.pem
+*.crt
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# ------------------------------------------------------------
+#  .NET / dotnet
+# ------------------------------------------------------------
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+project.lock.json
+artifacts/
+**/Properties/launchSettings.json
+*.dll
+*.pdb
+*.cache
+
+# EF Core local db
+*.db
+*.db-shm
+*.db-wal
+
+# Test results / coverage
+[Tt]est[Rr]esult*/
+TestResults/
+*.coverage
+*.coveragexml
+*.trx
+
+# Visual Studio / Rider
+.vs/
+.vscode/
+.idea/
+*.sln.docstates
+_ReSharper*/
+*.DotSettings.user
+
+# ------------------------------------------------------------
+#  React / Node / Vite (frontend)
+# ------------------------------------------------------------
+node_modules/
+**/node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+.cache/
+coverage/
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+*.log
+
+# Package manager artifacts (lock-файлы оставляем в репо)
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Vite / Vitest / TS build
+*.tsbuildinfo
+.eslintcache
+
+# ------------------------------------------------------------
+#  Docker / infra local data
+# ------------------------------------------------------------
+docker-compose.override.yml
+*.local.yml
+.minio/
+minio-data/
+pgdata/
+redis-data/
+rabbitmq-data/
+
+# ------------------------------------------------------------
+#  OS
+# ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------
+#  Проектные документы / материалы (не публикуем)
+# ------------------------------------------------------------
+proverka_cheka_documentation_api.docx
+project_fullstack_app.md
