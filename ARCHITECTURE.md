@@ -545,6 +545,44 @@ src/
 | QR сканирование         | @zxing/browser (камера) + file input                     |
 | Чарты                   | Recharts (PieChart, LineChart, BarChart)                 |
 
+### Цветовая палитра (CSS custom properties)
+
+Тема задаётся CSS-переменными в oklch-пространстве. Подключаются глобально в `app/styles/globals.css` и доступны через Tailwind как `var(--<token>)`.
+
+```css
+/* Фоновые слои (от тёмного к светлому) */
+--bg-dark:      oklch(0.1  0.005 255);  /* самый тёмный фон — модалки, оверлеи */
+--bg:           oklch(0.15 0.005 255);  /* основной фон страницы               */
+--bg-light:     oklch(0.2  0.005 255);  /* карточки, панели                    */
+
+/* Текст */
+--text:         oklch(0.96 0.01  255);  /* основной текст                      */
+--text-muted:   oklch(0.76 0.01  255);  /* второстепенный текст, плейсхолдеры  */
+
+/* Разделители и акценты */
+--highlight:    oklch(0.5  0.01  255);  /* выделение строк, hover-подсветка    */
+--border:       oklch(0.4  0.01  255);  /* основные границы                    */
+--border-muted: oklch(0.3  0.01  255);  /* тонкие разделители                  */
+
+/* Семантические цвета */
+--primary:      oklch(0.76 0.1   255);  /* основной акцент (синий)             */
+--secondary:    oklch(0.76 0.1    75);  /* вторичный акцент (жёлто-зелёный)    */
+--danger:       oklch(0.7  0.05   30);  /* ошибки, удаление                    */
+--warning:      oklch(0.7  0.05  100);  /* предупреждения                      */
+--success:      oklch(0.7  0.05  160);  /* успех, положительный баланс         */
+--info:         oklch(0.7  0.05  260);  /* информационные сообщения            */
+```
+
+**Соответствие доменным понятиям:**
+| Элемент UI                       | Токен              |
+|----------------------------------|--------------------|
+| Доходы / положительный баланс    | `--success`        |
+| Расходы / превышение бюджета     | `--danger`         |
+| Прогресс бюджета (≥80%)          | `--warning`        |
+| Статус «Ожидание» чека           | `--info`           |
+| Основная кнопка / ссылка         | `--primary`        |
+| Категория (дополнительный тон)   | `--secondary`      |
+
 ---
 
 ## 6. Инфраструктура и Docker Compose
@@ -684,12 +722,12 @@ jobs:
 ### Epic 1: MVP — базовая инфраструктура + Auth + Начисления + Категории
 
 **Story 1.1: Инициализация проекта**
-- [ ] T1.1.1 Создать .NET solution (`.slnx`, `Directory.Build.props`, `Directory.Packages.props`)
-- [ ] T1.1.2 Добавить проекты: Domain, Application, Infrastructure, Api
-- [ ] T1.1.3 Настроить EF Core + AppDbContext + UnitOfWork
-- [ ] T1.1.4 Настроить Serilog + appsettings.json
-- [ ] T1.1.5 Настроить Microsoft.AspNetCore.OpenApi + Scalar UI с версионированием
-- [ ] T1.1.6 Создать Docker Compose (postgres + redis + rabbitmq + backend + frontend)
+- [x] T1.1.1 Создать .NET solution (`.slnx`, `Directory.Build.props`, `Directory.Packages.props`)
+- [x] T1.1.2 Добавить проекты: Domain, Application, Infrastructure, Api
+- [x] T1.1.3 Настроить EF Core + AppDbContext + UnitOfWork
+- [x] T1.1.4 Настроить Serilog + appsettings.json
+- [x] T1.1.5 Настроить Microsoft.AspNetCore.OpenApi + Scalar UI с версионированием
+- [x] T1.1.6 Создать Docker Compose (postgres + redis + rabbitmq + backend + frontend)
 - [ ] T1.1.7 Инициализировать frontend (Vite + React 19 + TypeScript 5.9 + Tailwind + shadcn/ui)
 - [ ] T1.1.8 Настроить FSD структуру папок frontend
 - [ ] T1.1.9 Поднять MinIO (S3) в Docker Compose + бакет `finance-files` + клиент в Infrastructure
