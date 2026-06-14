@@ -156,7 +156,9 @@ services:
       args:
         # VITE_* are baked at build time, so pass as a build arg, not runtime env.
         VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
-        VITE_SUPABASE_URL: ${GOTRUE_EXTERNAL_URL:-http://localhost:9999}
+        # supabase-js appends /auth/v1; point it at the SPA origin, where nginx
+        # proxies /auth/v1/* to standalone GoTrue (same-origin, no CORS).
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:3000}
         VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-local-anon-key}
     depends_on:
       - backend

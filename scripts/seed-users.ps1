@@ -44,7 +44,9 @@ function New-ServiceRoleToken([string]$secret) {
 
 $token = New-ServiceRoleToken $JwtSecret
 $headers = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
-$endpoint = "$($GoTrueUrl.TrimEnd('/'))/auth/v1/admin/users"
+# Standalone GoTrue serves its API at the root (no /auth/v1 prefix — that is
+# added by the Supabase API gateway, which we do not run).
+$endpoint = "$($GoTrueUrl.TrimEnd('/'))/admin/users"
 
 $users = @(
     @{ email = "user1@finance.local"; role = "user" },
