@@ -730,12 +730,12 @@ jobs:
 - [x] T1.1.6 Создать Docker Compose (postgres + redis + rabbitmq + backend + frontend)
 - [x] T1.1.7 Инициализировать frontend (Vite + React 19 + TypeScript 5.9 + Tailwind + shadcn/ui)
 - [x] T1.1.8 Настроить FSD структуру папок frontend
-- [ ] T1.1.9 Поднять MinIO (S3) в Docker Compose + бакет `finance-files` + клиент в Infrastructure
-- [ ] T1.1.10 Health checks (`/health/live`, `/health/ready`) с пробами Postgres/Redis/RabbitMQ; liveness/readiness probes
-- [ ] T1.1.11 Глобальный rate limiting middleware (ASP.NET Core) + усиленные политики на `/scan-qr` и login
-- [ ] T1.1.12 EF Core global query filters по `UserId` (admin — `IgnoreQueryFilters`)
-- [ ] T1.1.13 OpenTelemetry + Prometheus endpoint `/metrics`
-- [ ] T1.1.14 nginx reverse proxy (TLS/https) — production-конфиг; убрать публичные порты внутренних панелей
+- [x] T1.1.9 Поднять MinIO (S3) в Docker Compose + бакет `finance-files` + клиент в Infrastructure
+- [x] T1.1.10 Health checks (`/health/live`, `/health/ready`) с пробами Postgres/Redis/RabbitMQ; liveness/readiness probes
+- [x] T1.1.11 Глобальный rate limiting middleware (ASP.NET Core) + усиленные политики на `/scan-qr` и login
+- [x] T1.1.12 EF Core global query filters по `UserId` (admin — `IgnoreQueryFilters`)
+- [x] T1.1.13 OpenTelemetry + Prometheus endpoint `/metrics`
+- [ ] T1.1.14 nginx reverse proxy (TLS/https) — production-конфиг; убрать публичные порты внутренних панелей _(отложено по решению заказчика — production-контур пока не разворачиваем)_
 
 **Story 1.2: Аутентификация и роли (Supabase GoTrue)**
 - [ ] T1.2.1 Настроить GoTrue сервис в Docker Compose (переменные, DB URL, JWT secret)

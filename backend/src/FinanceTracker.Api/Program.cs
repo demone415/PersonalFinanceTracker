@@ -1,4 +1,7 @@
+using FinanceTracker.Api.Observability;
+using FinanceTracker.Api.RateLimiting;
 using FinanceTracker.Infrastructure;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -10,9 +13,13 @@ builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfigurati
     .ReadFrom.Configuration(builder.Configuration)
     .ReadFrom.Services(services));
 
-// Infrastructure layer: EF Core / AppDbContext / Unit of Work (and later
-// messaging, caching, background jobs, external providers).
+// Infrastructure layer: EF Core / AppDbContext / Unit of Work, object storage,
+// readiness probes (and later messaging, caching, background jobs, providers).
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Cross-cutting API concerns: rate limiting (T1.1.11) and metrics (T1.1.13).
+builder.Services.AddApiRateLimiting();
+builder.Services.AddObservability();
 
 builder.Services.AddControllers();
 
@@ -24,6 +31,8 @@ var app = builder.Build();
 
 app.UseSerilogRequestLogging();
 
+app.UseRateLimiter();
+
 // API docs are a developer tool and are not exposed in production
 // (in prod nginx is the only public service — see ARCHITECTURE.md §11.5).
 if (app.Environment.IsDevelopment())
@@ -33,6 +42,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+
+// Liveness vs readiness split by health-check tag (T1.1.10, ARCHITECTURE.md §11.5).
+// Liveness = process is up; readiness = Postgres/Redis/RabbitMQ/MinIO reachable.
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live"),
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+});
+
+// Prometheus scraping endpoint (T1.1.13): GET /metrics.
+app.MapPrometheusScrapingEndpoint();
 
 app.MapGet("/", () => "FinanceTracker API");
 
