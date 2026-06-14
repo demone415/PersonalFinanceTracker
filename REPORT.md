@@ -1,7 +1,7 @@
 Начало работы: вечер 2026-06-10
 
 Использую Claude Code через Claude Desktop
-Модель `Sonnet 4.6 / effort = High`, если не указано иное
+Модель почти везде `Sonnet 4.8 / effort = High`
 
 Плагины: 
 - [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills)
@@ -109,12 +109,17 @@ The gate fires on every Write. Since I have several new files to create for legi
 Edited a file, read a file
 Let me test whether the hook is now disabled:
 
-Updated
-FinanceTracker.Domain.csproj +2-6
+Updated FinanceTracker.Domain.csproj +2-6
 The hook is now disabled. Let me write the remaining csproj files cleanly:
 ```
 
 ---
+
+После реализации аутентификации и создания всех инфры решил запустить проект.
+Клод сразу нашел баг с путями auth в supabase. Фронт смотрел не туда. Клод бодро починил. [PR#4](https://github.com/demone415/PersonalFinanceTracker/pull/4). Все корректно запустилось, авторизоваться смог (был отдельный admin аккаунт с only-admin route)
+
+
+
 
 
 
