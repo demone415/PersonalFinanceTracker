@@ -1,0 +1,99 @@
+# Finance Tracker — local development stack.
+#
+# Scope of task T1.1.6: postgres + redis + rabbitmq + backend + frontend.
+# Supabase GoTrue (auth) is added in T1.2.1, MinIO in T1.1.9, nginx in T1.1.14.
+#
+# The `frontend` service is guarded by the `frontend` compose profile because the
+# frontend project is scaffolded in T1.1.7. Until then bring up the backend stack with:
+#     docker compose up
+# and (after T1.1.7) the full stack with:
+#     docker compose --profile frontend up
+
+services:
+  # ── PostgreSQL (Supabase image — ready for the auth.* schema in T1.2.1) ──
+  postgres:
+    image: supabase/postgres:15.1.0.147
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-finance}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-finance}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis (FusionCache backplane + rate-limit counters) ──
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── RabbitMQ (Wolverine message bus + DLQ). Management console: internal only ──
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # management UI (dev only; not exposed publicly in prod)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ── Backend (.NET 10 API) ──
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-finance};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      ConnectionStrings__Redis: "redis:6379"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5000:8080"
+
+  # ── Frontend (React SPA) — enable with: docker compose --profile frontend up ──
+  frontend:
+    profiles: ["frontend"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:5000
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
