@@ -1,4 +1,5 @@
 using FinanceTracker.Application.Common.Interfaces;
+using FinanceTracker.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinanceTracker.Infrastructure.Persistence;
@@ -14,6 +15,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
 {
     /// <summary>The authenticated caller, referenced by the data-isolation query filter.</summary>
     public ICurrentUserService CurrentUser => currentUser;
+
+    public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

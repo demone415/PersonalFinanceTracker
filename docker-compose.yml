@@ -79,6 +79,35 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── Supabase GoTrue (authentication; issues HS256 JWTs) ──
+  # Owns the auth.* schema in the finance DB and auto-migrates it on startup.
+  # The .NET API never calls GoTrue per request — it validates JWTs offline by
+  # the shared secret (see §11.1). Public signup is closed; emails auto-confirm.
+  supabase-auth:
+    image: supabase/gotrue:v2.151.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: "9999"
+      API_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL:-http://localhost:9999}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-finance}?search_path=auth"
+      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      GOTRUE_JWT_ISSUER: "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      # Public signup closed (T1.2.9): users are created by admin via Admin API.
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+    ports:
+      - "9999:9999"
+
   # ── Backend (.NET 10 API) ──
   backend:
     build:
@@ -104,6 +133,9 @@ services:
       S3__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
       S3__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
       S3__BucketName: finance-files
+      Supabase__JwtSecret: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      Supabase__Issuer: "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
+      Supabase__Audience: authenticated
     ports:
       - "5000:8080"
 
