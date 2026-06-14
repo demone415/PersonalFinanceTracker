@@ -116,7 +116,5 @@ The hook is now disabled. Let me write the remaining csproj files cleanly:
 
 ---
 
-Ты можешь комитить Prompts.md и REPORT.md, если есть в них изменения. Но не меняй их никак
 
----
 

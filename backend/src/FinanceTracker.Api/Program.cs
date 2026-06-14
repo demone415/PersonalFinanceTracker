@@ -1,3 +1,4 @@
+using FinanceTracker.Api.Authentication;
 using FinanceTracker.Api.Observability;
 using FinanceTracker.Api.RateLimiting;
 using FinanceTracker.Infrastructure;
@@ -17,6 +18,9 @@ builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfigurati
 // readiness probes (and later messaging, caching, background jobs, providers).
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// GoTrue JWT validation (T1.2.2): offline HS256 validation by the shared secret.
+builder.Services.AddGoTrueJwtAuthentication(builder.Configuration);
+
 // Cross-cutting API concerns: rate limiting (T1.1.11) and metrics (T1.1.13).
 builder.Services.AddApiRateLimiting();
 builder.Services.AddObservability();
@@ -30,6 +34,11 @@ builder.Services.AddOpenApi("v1");
 var app = builder.Build();
 
 app.UseSerilogRequestLogging();
+
+// Authentication must run before the rate limiter, which partitions by the
+// authenticated user (sub claim) when present.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseRateLimiter();
 

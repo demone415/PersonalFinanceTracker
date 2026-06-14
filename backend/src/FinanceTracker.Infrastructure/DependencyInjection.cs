@@ -35,10 +35,10 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        // Data-isolation caller context. Deny-by-default placeholder until the
-        // HTTP/JWT-bound implementation lands in T1.2.3, which replaces this
-        // registration. TryAdd lets the real service win if registered earlier.
-        services.TryAddScoped<ICurrentUserService, PlaceholderCurrentUserService>();
+        // Data-isolation caller context (T1.2.3): reads UserId / IsAdmin from the
+        // validated GoTrue JWT on the current HttpContext.
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         AddObjectStorage(services, configuration);
         AddHealthChecks(services, configuration, connectionString);

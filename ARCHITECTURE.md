@@ -738,11 +738,11 @@ jobs:
 - [ ] T1.1.14 nginx reverse proxy (TLS/https) — production-конфиг; убрать публичные порты внутренних панелей _(отложено по решению заказчика — production-контур пока не разворачиваем)_
 
 **Story 1.2: Аутентификация и роли (Supabase GoTrue)**
-- [ ] T1.2.1 Настроить GoTrue сервис в Docker Compose (переменные, DB URL, JWT secret)
-- [ ] T1.2.2 Настроить .NET JWT-валидацию по `SUPABASE_JWT_SECRET`: пиннинг `HS256`, проверка `iss/aud/exp`; роль — строго из `app_metadata.role` (никогда из `user_metadata`)
-- [ ] T1.2.3 Реализовать `ICurrentUserService` + `CurrentUserService` (читает UserId и IsAdmin из HttpContext)
-- [ ] T1.2.4 Создать `public.user_profiles` таблицу + EF Core entity, FK → `auth.users.id`
-- [ ] T1.2.5 Seed 3 пользователей (2 user + 1 admin) через GoTrue Admin API; назначить `app_metadata.role`
+- [x] T1.2.1 Настроить GoTrue сервис в Docker Compose (переменные, DB URL, JWT secret)
+- [x] T1.2.2 Настроить .NET JWT-валидацию по `SUPABASE_JWT_SECRET`: пиннинг `HS256`, проверка `iss/aud/exp`; роль — строго из `app_metadata.role` (никогда из `user_metadata`)
+- [x] T1.2.3 Реализовать `ICurrentUserService` + `CurrentUserService` (читает UserId и IsAdmin из HttpContext)
+- [x] T1.2.4 Создать `public.user_profiles` таблицу + EF Core entity, FK → `auth.users.id`
+- [x] T1.2.5 Seed 3 пользователей (2 user + 1 admin) через GoTrue Admin API; назначить `app_metadata.role`
 - [ ] T1.2.6 Настроить `@supabase/supabase-js` клиент на фронтенде
 - [ ] T1.2.7 Страница Login (форма через Supabase client SDK)
 - [ ] T1.2.8 Auth context (Zustand) — хранить UserId, роль, сессию; ProtectedRoute + AdminRoute
@@ -918,6 +918,7 @@ jobs:
 - Валидация GoTrue-JWT по shared secret `SUPABASE_JWT_SECRET` с **пиннингом алгоритма `HS256`** (отвергаем `alg: none` и подмену), проверкой `iss`, `aud`, `exp`, подписи.
 - Роль читается **строго из `app_metadata.role`** (server-controlled). `user_metadata` юзер меняет сам — оттуда роль не берём никогда (иначе эскалация до admin).
 - `ICurrentUserService` отдаёт `UserId` (`sub`) и `IsAdmin`; HTTP-слой инкапсулирован.
+- ⚠️ **На будущее — переход на асимметричную подпись (RS256/ES256):** сейчас HS256 + общий секрет в конфиге обеих сторон. Опционально перейти на асимметричные ключи GoTrue: приватный ключ только у GoTrue, публичный — в `/.well-known/jwks.json`, а `JwtBearer` валидирует через `Authority`/`MetadataAddress` (авто-загрузка и кэш JWKS). Плюсы: ротация ключей без передеплоя API, секрет не хранится на бэкенде. Минусы: сетевая зависимость от GoTrue при старте/refresh метаданных, чуть сложнее локалка. Пока остаёмся на HS256.
 
 ### 11.2 Изоляция данных — global query filters (H2)
 - На всех сущностях с `UserId` (Accrual, Receipt, Category, MonthlyBudget, ChangeLog, BackgroundTask) — **EF Core global query filter** `e => _currentUser.IsAdmin || e.UserId == _currentUser.UserId`.

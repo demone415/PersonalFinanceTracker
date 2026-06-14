@@ -14,10 +14,11 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
   </ItemGroup>
 
-  <!-- API: OpenAPI + Scalar UI -->
+  <!-- API: OpenAPI + Scalar UI + JWT auth -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
   </ItemGroup>
 
   <!-- Logging: Serilog (sinks configured via appsettings.json) -->
