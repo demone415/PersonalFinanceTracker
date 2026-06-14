@@ -102,9 +102,17 @@ services:
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_ADMIN_ROLES: service_role
       # Public signup closed (T1.2.9): users are created by admin via Admin API.
+      # Emails auto-confirm, captcha stays off (GOTRUE_SECURITY_CAPTCHA_ENABLED
+      # defaults to false).
       GOTRUE_DISABLE_SIGNUP: "true"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      # Login brute-force / credential-stuffing protection (T1.2.10): the /token
+      # endpoint (password grant + refresh) is rate-limited per client IP. The IP
+      # is taken from this header, which the edge proxy sets (and must strip from
+      # client input in production).
+      GOTRUE_RATE_LIMIT_HEADER: X-Forwarded-For
+      GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "30"
     ports:
       - "9999:9999"
 
@@ -148,8 +156,11 @@ services:
       args:
         # VITE_* are baked at build time, so pass as a build arg, not runtime env.
         VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
+        VITE_SUPABASE_URL: ${GOTRUE_EXTERNAL_URL:-http://localhost:9999}
+        VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-local-anon-key}
     depends_on:
       - backend
+      - supabase-auth
     ports:
       - "3000:80"
 

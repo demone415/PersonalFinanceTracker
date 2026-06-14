@@ -1,14 +1,21 @@
 import { env } from '@/shared/config/env'
+import { supabase } from './supabase'
 
 /**
- * Thin fetch wrapper around the backend API. Auth headers and error mapping
- * are layered on in later auth/feature tasks; for now it just resolves the
- * base URL and parses JSON.
+ * Thin fetch wrapper around the backend API. Attaches the current GoTrue access
+ * token as a Bearer header when a session exists; the backend validates it.
  */
 export async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+
   const response = await fetch(`${env.apiUrl}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   })
 
   if (!response.ok) {

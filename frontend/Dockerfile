@@ -5,6 +5,10 @@ WORKDIR /app
 # VITE_* vars are baked at build time; pass via build args from docker compose.
 ARG VITE_API_URL=http://localhost:5000
 ENV VITE_API_URL=${VITE_API_URL}
+ARG VITE_SUPABASE_URL=http://localhost:9999
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ARG VITE_SUPABASE_ANON_KEY=local-anon-key
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
 COPY package*.json ./
 RUN npm ci

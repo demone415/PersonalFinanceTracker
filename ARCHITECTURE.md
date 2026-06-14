@@ -743,11 +743,11 @@ jobs:
 - [x] T1.2.3 Реализовать `ICurrentUserService` + `CurrentUserService` (читает UserId и IsAdmin из HttpContext)
 - [x] T1.2.4 Создать `public.user_profiles` таблицу + EF Core entity, FK → `auth.users.id`
 - [x] T1.2.5 Seed 3 пользователей (2 user + 1 admin) через GoTrue Admin API; назначить `app_metadata.role`
-- [ ] T1.2.6 Настроить `@supabase/supabase-js` клиент на фронтенде
-- [ ] T1.2.7 Страница Login (форма через Supabase client SDK)
-- [ ] T1.2.8 Auth context (Zustand) — хранить UserId, роль, сессию; ProtectedRoute + AdminRoute
-- [ ] T1.2.9 Закрыть публичный signup в GoTrue; регистрацию юзеров делает админ через Admin API. Email-подтверждение и капчу не включаем
-- [ ] T1.2.10 Rate-limit на login (защита от брутфорса / credential stuffing)
+- [x] T1.2.6 Настроить `@supabase/supabase-js` клиент на фронтенде
+- [x] T1.2.7 Страница Login (форма через Supabase client SDK)
+- [x] T1.2.8 Auth context (Zustand) — хранить UserId, роль, сессию; ProtectedRoute + AdminRoute
+- [x] T1.2.9 Закрыть публичный signup в GoTrue; регистрацию юзеров делает админ через Admin API. Email-подтверждение и капчу не включаем
+- [x] T1.2.10 Rate-limit на login (защита от брутфорса / credential stuffing)
 
 **Story 1.3: Категории**
 - [ ] T1.3.1 Category entity + миграция + seed 12 категорий
