@@ -1,7 +1,8 @@
 # Finance Tracker — local development stack.
 #
-# Scope of task T1.1.6: postgres + redis + rabbitmq + backend + frontend.
-# Supabase GoTrue (auth) is added in T1.2.1, MinIO in T1.1.9, nginx in T1.1.14.
+# postgres + redis + rabbitmq + minio + backend + frontend.
+# Supabase GoTrue (auth) is added in T1.2.1. The production nginx reverse proxy
+# lives in docker-compose.prod.yml (T1.1.14).
 #
 # The `frontend` service is guarded by the `frontend` compose profile because the
 # frontend project is scaffolded in T1.1.7. Until then bring up the backend stack with:
@@ -58,6 +59,26 @@ services:
       timeout: 10s
       retries: 10
 
+  # ── MinIO (S3-compatible object storage; private bucket finance-files) ──
+  # Accessed via the AWS S3 SDK, so the backend is provider-agnostic. The bucket
+  # is created at app startup by S3BucketInitializer. Console: internal only.
+  minio:
+    image: minio/minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"     # S3 API
+      - "9001:9001"     # console (dev only; not exposed publicly in prod)
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   # ── Backend (.NET 10 API) ──
   backend:
     build:
@@ -70,6 +91,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-finance};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
@@ -77,6 +100,10 @@ services:
       RabbitMq__Host: rabbitmq
       RabbitMq__Username: ${RABBITMQ_USER:-guest}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      S3__Endpoint: "http://minio:9000"
+      S3__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      S3__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3__BucketName: finance-files
     ports:
       - "5000:8080"
 
@@ -86,10 +113,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # VITE_* are baked at build time, so pass as a build arg, not runtime env.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: http://localhost:5000
     ports:
       - "3000:80"
 
@@ -97,3 +125,4 @@ volumes:
   postgres-data:
   redis-data:
   rabbitmq-data:
+  minio-data:

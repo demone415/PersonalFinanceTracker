@@ -25,8 +25,32 @@
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
 
+  <!-- Object storage: AWS S3 SDK — provider-agnostic, talks to MinIO / AWS S3 /
+       any S3-compatible store via ServiceURL + ForcePathStyle (see IFileStorage). -->
+  <ItemGroup>
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.24.4" />
+    <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.4.7" />
+  </ItemGroup>
+
+  <!-- Health checks: Postgres / Redis / RabbitMQ / MinIO readiness probes -->
+  <ItemGroup>
+    <PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageVersion Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+    <PackageVersion Include="AspNetCore.HealthChecks.Rabbitmq" Version="9.0.0" />
+    <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
+  </ItemGroup>
+
+  <!-- Observability: OpenTelemetry metrics → Prometheus scraping endpoint -->
+  <ItemGroup>
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.16.0-beta.1" />
+  </ItemGroup>
+
   <!-- Testing -->
   <ItemGroup>
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.9" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
