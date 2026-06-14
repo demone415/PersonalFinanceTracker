@@ -918,6 +918,7 @@ jobs:
 - Валидация GoTrue-JWT по shared secret `SUPABASE_JWT_SECRET` с **пиннингом алгоритма `HS256`** (отвергаем `alg: none` и подмену), проверкой `iss`, `aud`, `exp`, подписи.
 - Роль читается **строго из `app_metadata.role`** (server-controlled). `user_metadata` юзер меняет сам — оттуда роль не берём никогда (иначе эскалация до admin).
 - `ICurrentUserService` отдаёт `UserId` (`sub`) и `IsAdmin`; HTTP-слой инкапсулирован.
+- ⚠️ **На будущее — переход на асимметричную подпись (RS256/ES256):** сейчас HS256 + общий секрет в конфиге обеих сторон. Опционально перейти на асимметричные ключи GoTrue: приватный ключ только у GoTrue, публичный — в `/.well-known/jwks.json`, а `JwtBearer` валидирует через `Authority`/`MetadataAddress` (авто-загрузка и кэш JWKS). Плюсы: ротация ключей без передеплоя API, секрет не хранится на бэкенде. Минусы: сетевая зависимость от GoTrue при старте/refresh метаданных, чуть сложнее локалка. Пока остаёмся на HS256.
 
 ### 11.2 Изоляция данных — global query filters (H2)
 - На всех сущностях с `UserId` (Accrual, Receipt, Category, MonthlyBudget, ChangeLog, BackgroundTask) — **EF Core global query filter** `e => _currentUser.IsAdmin || e.UserId == _currentUser.UserId`.
