@@ -86,10 +86,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # VITE_* are baked at build time, so pass as a build arg, not runtime env.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: http://localhost:5000
     ports:
       - "3000:80"
 
