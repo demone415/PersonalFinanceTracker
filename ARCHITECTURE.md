@@ -728,8 +728,8 @@ jobs:
 - [x] T1.1.4 Настроить Serilog + appsettings.json
 - [x] T1.1.5 Настроить Microsoft.AspNetCore.OpenApi + Scalar UI с версионированием
 - [x] T1.1.6 Создать Docker Compose (postgres + redis + rabbitmq + backend + frontend)
-- [ ] T1.1.7 Инициализировать frontend (Vite + React 19 + TypeScript 5.9 + Tailwind + shadcn/ui)
-- [ ] T1.1.8 Настроить FSD структуру папок frontend
+- [x] T1.1.7 Инициализировать frontend (Vite + React 19 + TypeScript 5.9 + Tailwind + shadcn/ui)
+- [x] T1.1.8 Настроить FSD структуру папок frontend
 - [ ] T1.1.9 Поднять MinIO (S3) в Docker Compose + бакет `finance-files` + клиент в Infrastructure
 - [ ] T1.1.10 Health checks (`/health/live`, `/health/ready`) с пробами Postgres/Redis/RabbitMQ; liveness/readiness probes
 - [ ] T1.1.11 Глобальный rate limiting middleware (ASP.NET Core) + усиленные политики на `/scan-qr` и login
