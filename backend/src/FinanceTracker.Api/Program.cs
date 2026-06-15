@@ -35,6 +35,17 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApiRateLimiting();
 builder.Services.AddObservability();
 
+// CORS for the SPA. Outside production the frontend (e.g. :3000 / Vite :5173)
+// is a different origin than the API (:5000), so browser preflight needs it.
+// In production nginx makes them same-origin (ARCHITECTURE.md §11.5).
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:3000", "http://localhost:5173"];
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy => policy
+        .WithOrigins(corsOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+
 // FluentValidation runs via a global action filter (see ValidationFilter).
 // Idempotency-Key deduplication runs via IdempotencyFilter (ARCHITECTURE.md §4).
 builder.Services.AddControllers(options =>
@@ -52,6 +63,10 @@ var app = builder.Build();
 app.UseExceptionHandler();
 
 app.UseSerilogRequestLogging();
+
+// CORS must run before auth/rate limiter so the unauthenticated preflight
+// OPTIONS is answered (and not rate-limited or rejected as 405/401).
+app.UseCors();
 
 // Authentication must run before the rate limiter, which partitions by the
 // authenticated user (sub claim) when present.
