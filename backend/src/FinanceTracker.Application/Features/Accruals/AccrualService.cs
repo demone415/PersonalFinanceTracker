@@ -2,6 +2,7 @@ using FinanceTracker.Application.Common.Exceptions;
 using FinanceTracker.Application.Common.Interfaces;
 using FinanceTracker.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FinanceTracker.Application.Features.Accruals;
 
@@ -13,7 +14,8 @@ public sealed class AccrualService(
     IApplicationDbContext db,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
-    IDashboardCache dashboardCache)
+    IDashboardCache dashboardCache,
+    ILogger<AccrualService> logger)
 {
     public async Task<PagedResult<AccrualListItemDto>> GetPagedAsync(
         AccrualFilterRequest filter,
@@ -97,7 +99,7 @@ public sealed class AccrualService(
 
         db.Accruals.Add(accrual);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await dashboardCache.InvalidateAsync(userId, cancellationToken);
+        await InvalidateDashboardAsync(userId, cancellationToken);
 
         return await GetByIdAsync(accrual.Id, cancellationToken);
     }
@@ -123,7 +125,7 @@ public sealed class AccrualService(
         accrual.SetTags(request.Tags ?? []);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await dashboardCache.InvalidateAsync(accrual.UserId, cancellationToken);
+        await InvalidateDashboardAsync(accrual.UserId, cancellationToken);
         return await GetByIdAsync(accrual.Id, cancellationToken);
     }
 
@@ -133,7 +135,7 @@ public sealed class AccrualService(
         var ownerId = accrual.UserId;
         db.Accruals.Remove(accrual);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await dashboardCache.InvalidateAsync(ownerId, cancellationToken);
+        await InvalidateDashboardAsync(ownerId, cancellationToken);
     }
 
     // ── Receipt items (T1.4.7) ────────────────────────────────────────────────
@@ -218,6 +220,25 @@ public sealed class AccrualService(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Drops the owner's cached dashboard aggregates after a committed write.
+    /// Best-effort: a cache failure must never fail a write that already
+    /// succeeded — the entry self-heals on its 5-minute TTL.
+    /// </summary>
+    private async Task InvalidateDashboardAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dashboardCache.InvalidateAsync(userId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Failed to invalidate dashboard cache for user {UserId}; it will expire on TTL.",
+                userId);
+        }
+    }
 
     private async Task<Accrual> LoadOwnedAsync(Guid id, CancellationToken cancellationToken)
     {
