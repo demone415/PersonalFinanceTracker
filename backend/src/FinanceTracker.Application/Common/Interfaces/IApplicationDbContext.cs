@@ -17,4 +17,5 @@ public interface IApplicationDbContext
     DbSet<Receipt> Receipts { get; }
     DbSet<ReceiptItem> ReceiptItems { get; }
     DbSet<ChangeLog> ChangeLogs { get; }
+    DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 }

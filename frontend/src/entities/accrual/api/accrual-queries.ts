@@ -1,17 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { accrualApi } from './accrual-api'
-import type { AccrualFilter, AccrualInput, ReceiptItemInput } from '../model/types'
+import type { AccrualFilter, AccrualInput, AccrualListItem, PagedResult, ReceiptItemInput } from '../model/types'
 
 const KEYS = {
   all: ['accruals'] as const,
-  list: (filter: AccrualFilter) => ['accruals', 'list', filter] as const,
+  list: () => ['accruals', 'list'] as const,
+  listFiltered: (filter: AccrualFilter) => ['accruals', 'list', filter] as const,
   detail: (id: string) => ['accruals', id] as const,
   receipt: (id: string) => ['accruals', id, 'receipt'] as const,
 }
 
 export function useAccruals(filter: AccrualFilter = {}) {
   return useQuery({
-    queryKey: KEYS.list(filter),
+    queryKey: KEYS.listFiltered(filter),
     queryFn: () => accrualApi.list(filter),
   })
 }
@@ -36,7 +37,33 @@ export function useCreateAccrual() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: AccrualInput) => accrualApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: KEYS.list() })
+      const snapshot = qc.getQueriesData<PagedResult<AccrualListItem>>({ queryKey: KEYS.list() })
+      qc.setQueriesData<PagedResult<AccrualListItem>>(
+        { queryKey: KEYS.list() },
+        (old) => {
+          if (!old) return old
+          const optimistic: AccrualListItem = {
+            id: `optimistic-${Date.now()}`,
+            amount: input.amount,
+            date: input.date,
+            type: input.type,
+            currency: input.currency,
+            categoryId: input.categoryId ?? undefined,
+            description: input.description,
+            includeInStats: input.includeInStats,
+            tags: input.tags,
+          }
+          return { ...old, items: [optimistic, ...old.items], totalCount: old.totalCount + 1 }
+        }
+      )
+      return { snapshot }
+    },
+    onError: (_err, _input, ctx) => {
+      ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data))
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: KEYS.all }),
   })
 }
 
@@ -45,7 +72,35 @@ export function useUpdateAccrual() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: AccrualInput }) =>
       accrualApi.update(id, input),
-    onSuccess: (_data, { id }) => {
+    onMutate: async ({ id, input }) => {
+      await qc.cancelQueries({ queryKey: KEYS.all })
+      const listSnapshot = qc.getQueriesData<PagedResult<AccrualListItem>>({ queryKey: KEYS.list() })
+      const detailSnapshot = qc.getQueryData(KEYS.detail(id))
+      qc.setQueriesData<PagedResult<AccrualListItem>>(
+        { queryKey: KEYS.list() },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            items: old.items.map((item) =>
+              item.id === id
+                ? { ...item, amount: input.amount, date: input.date, type: input.type,
+                    currency: input.currency, categoryId: input.categoryId ?? undefined,
+                    description: input.description, includeInStats: input.includeInStats,
+                    tags: input.tags }
+                : item
+            ),
+          }
+        }
+      )
+      return { listSnapshot, detailSnapshot }
+    },
+    onError: (_err, { id }, ctx) => {
+      ctx?.listSnapshot.forEach(([key, data]) => qc.setQueryData(key, data))
+      if (ctx?.detailSnapshot !== undefined)
+        qc.setQueryData(KEYS.detail(id), ctx.detailSnapshot)
+    },
+    onSettled: (_data, _err, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.all })
       qc.invalidateQueries({ queryKey: KEYS.detail(id) })
     },
@@ -56,7 +111,26 @@ export function useDeleteAccrual() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => accrualApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: KEYS.list() })
+      const snapshot = qc.getQueriesData<PagedResult<AccrualListItem>>({ queryKey: KEYS.list() })
+      qc.setQueriesData<PagedResult<AccrualListItem>>(
+        { queryKey: KEYS.list() },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            items: old.items.filter((item) => item.id !== id),
+            totalCount: Math.max(0, old.totalCount - 1),
+          }
+        }
+      )
+      return { snapshot }
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data))
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: KEYS.all }),
   })
 }
 

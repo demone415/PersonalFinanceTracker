@@ -35,7 +35,12 @@ builder.Services.AddApiRateLimiting();
 builder.Services.AddObservability();
 
 // FluentValidation runs via a global action filter (see ValidationFilter).
-builder.Services.AddControllers(options => options.Filters.Add<ValidationFilter>());
+// Idempotency-Key deduplication runs via IdempotencyFilter (ARCHITECTURE.md §4).
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ValidationFilter>();
+    options.Filters.Add<IdempotencyFilter>();
+});
 
 // OpenAPI document "v1" — matches the URL-segment API version (/api/v1).
 // Additional versions register their own document (e.g. AddOpenApi("v2")).
