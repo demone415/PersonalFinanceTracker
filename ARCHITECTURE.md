@@ -787,9 +787,9 @@ jobs:
 ### Epic 3: Фильтрация и поиск
 
 **Story 3.1: Фильтры начислений**
-- [ ] T3.1.1 Backend: query params dateFrom/dateTo, categoryId, amountMin/Max, type
-- [ ] T3.1.2 Frontend: компонент FilterPanel
-- [ ] T3.1.3 Синхронизация фильтров с URL query params
+- [x] T3.1.1 Backend: query params dateFrom/dateTo, categoryId, amountMin/Max, type
+- [x] T3.1.2 Frontend: компонент FilterPanel
+- [x] T3.1.3 Синхронизация фильтров с URL query params
 
 ---
 
