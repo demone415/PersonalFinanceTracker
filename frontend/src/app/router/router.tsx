@@ -5,6 +5,8 @@ import { AdminPage } from '@/pages/admin'
 import { CategoriesPage } from '@/pages/categories'
 import { AccrualsPage } from '@/pages/accruals'
 import { AccrualDetailPage } from '@/pages/accrual-detail'
+import { ComingSoonPage } from '@/pages/coming-soon'
+import { AppShell } from '@/widgets/app-shell'
 import { ProtectedRoute } from './ProtectedRoute'
 import { AdminRoute } from './AdminRoute'
 
@@ -16,14 +18,22 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
-      { path: '/', element: <HomePage /> },
-      { path: '/categories', element: <CategoriesPage /> },
-      { path: '/accruals', element: <AccrualsPage /> },
-      { path: '/accruals/:id', element: <AccrualDetailPage /> },
+      {
+        element: <AppShell />,
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/accruals', element: <AccrualsPage /> },
+          { path: '/accruals/:id', element: <AccrualDetailPage /> },
+          { path: '/categories', element: <CategoriesPage /> },
+          { path: '/budgets', element: <ComingSoonPage title="Бюджеты" /> },
+          { path: '/journal', element: <ComingSoonPage title="Журнал изменений" /> },
+          { path: '/scan', element: <ComingSoonPage title="Сканирование QR" /> },
+          {
+            element: <AdminRoute />,
+            children: [{ path: '/admin', element: <AdminPage /> }],
+          },
+        ],
+      },
     ],
-  },
-  {
-    element: <AdminRoute />,
-    children: [{ path: '/admin', element: <AdminPage /> }],
   },
 ])
