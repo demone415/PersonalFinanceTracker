@@ -11,12 +11,14 @@ namespace FinanceTracker.Infrastructure.Persistence;
 /// <see cref="ModelBuilder.ApplyConfigurationsFromAssembly(System.Reflection.Assembly)"/>.
 /// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserService currentUser)
-    : DbContext(options), IUserIsolatedContext
+    : DbContext(options), IUserIsolatedContext, IApplicationDbContext
 {
     /// <summary>The authenticated caller, referenced by the data-isolation query filter.</summary>
     public ICurrentUserService CurrentUser => currentUser;
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+
+    public DbSet<Category> Categories => Set<Category>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +28,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
         // Data isolation by default (ARCHITECTURE.md §11.2): every user-owned
         // entity is filtered to the current caller; admins bypass via IsAdmin.
         UserIsolationQueryFilter.Apply(modelBuilder, this);
+
+        // Categories are special: a null UserId is a shared system category that
+        // every caller can see (but only admins may modify — enforced in the service).
+        modelBuilder.Entity<Category>().HasQueryFilter(c =>
+            CurrentUser.IsAdmin || c.UserId == null || c.UserId == CurrentUser.UserId);
 
         base.OnModelCreating(modelBuilder);
     }

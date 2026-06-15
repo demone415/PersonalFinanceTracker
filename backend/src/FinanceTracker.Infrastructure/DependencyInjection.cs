@@ -34,6 +34,7 @@ public static class DependencyInjection
                 npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         // Data-isolation caller context (T1.2.3): reads UserId / IsAdmin from the
         // validated GoTrue JWT on the current HttpContext.

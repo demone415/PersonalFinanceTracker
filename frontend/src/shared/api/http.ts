@@ -22,5 +22,10 @@ export async function http<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`Request failed: ${response.status} ${response.statusText}`)
   }
 
+  // 204 No Content (e.g. DELETE) has no body to parse.
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T
+  }
+
   return response.json() as Promise<T>
 }

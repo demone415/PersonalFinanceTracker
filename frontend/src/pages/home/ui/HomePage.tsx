@@ -19,6 +19,9 @@ export function HomePage() {
         </p>
       </div>
       <div className="flex items-center gap-3">
+        <Button asChild>
+          <Link to="/categories">Категории</Link>
+        </Button>
         {isAdmin && (
           <Button variant="secondary" asChild>
             <Link to="/admin">Администрирование</Link>
