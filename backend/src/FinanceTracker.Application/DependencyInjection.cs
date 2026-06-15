@@ -1,3 +1,4 @@
+using FinanceTracker.Application.Features.Accruals;
 using FinanceTracker.Application.Features.Categories;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<CreateCategoryRequestValidator>();
 
         services.AddScoped<CategoryService>();
+        services.AddScoped<AccrualService>();
 
         return services;
     }

@@ -3,6 +3,7 @@ using Amazon.S3;
 using FinanceTracker.Application.Common.Interfaces;
 using FinanceTracker.Infrastructure.Identity;
 using FinanceTracker.Infrastructure.Persistence;
+using FinanceTracker.Infrastructure.Persistence.Interceptors;
 using FinanceTracker.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,9 +30,14 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Connection string 'Postgres' is not configured.");
 
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddScoped<ChangeLogInterceptor>();
+
+        services.AddDbContext<AppDbContext>((sp, options) =>
+        {
             options.UseNpgsql(connectionString, npgsql =>
-                npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
+                npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName));
+            options.AddInterceptors(sp.GetRequiredService<ChangeLogInterceptor>());
+        });
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AppDbContext>());

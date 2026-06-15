@@ -12,4 +12,9 @@ namespace FinanceTracker.Application.Common.Interfaces;
 public interface IApplicationDbContext
 {
     DbSet<Category> Categories { get; }
+    DbSet<Accrual> Accruals { get; }
+    DbSet<AccrualTag> AccrualTags { get; }
+    DbSet<Receipt> Receipts { get; }
+    DbSet<ReceiptItem> ReceiptItems { get; }
+    DbSet<ChangeLog> ChangeLogs { get; }
 }

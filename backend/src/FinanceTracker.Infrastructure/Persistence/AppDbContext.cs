@@ -17,8 +17,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
     public ICurrentUserService CurrentUser => currentUser;
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
-
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Accrual> Accruals => Set<Accrual>();
+    public DbSet<AccrualTag> AccrualTags => Set<AccrualTag>();
+    public DbSet<Receipt> Receipts => Set<Receipt>();
+    public DbSet<ReceiptItem> ReceiptItems => Set<ReceiptItem>();
+    public DbSet<ChangeLog> ChangeLogs => Set<ChangeLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
