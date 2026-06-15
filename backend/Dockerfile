@@ -21,6 +21,14 @@ RUN dotnet publish src/FinanceTracker.Api/FinanceTracker.Api.csproj \
 # ---- Runtime stage ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+# curl: used by the docker compose HEALTHCHECK (aspnet image ships neither
+# curl nor wget). libgssapi-krb5-2: satisfies Npgsql's Kerberos probe so it
+# stops logging a noisy "cannot load libgssapi_krb5.so.2" at startup.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app ./
 
 # Kestrel listens on 8080 inside the container (mapped to 5000 on the host).
