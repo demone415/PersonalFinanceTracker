@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import {
-  LayoutDashboard, ArrowLeftRight, Shapes, Target, History,
+  LayoutDashboard, PieChart, ArrowLeftRight, Shapes, Target, History,
   QrCode, Shield, LogOut, X, Wallet, type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/shared/api/supabase'
@@ -19,6 +19,7 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { to: '/', label: 'Главная', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', label: 'Аналитика', icon: PieChart },
   { to: '/accruals', label: 'Начисления', icon: ArrowLeftRight },
   { to: '/categories', label: 'Категории', icon: Shapes },
   { to: '/budgets', label: 'Бюджеты', icon: Target },
@@ -153,6 +154,7 @@ export function AppShell() {
                 <X />
               </Button>
             </div>
+            <SheetLink to="/dashboard" icon={PieChart} label="Аналитика" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/budgets" icon={Target} label="Бюджеты" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/journal" icon={History} label="Журнал" onClick={() => setMoreOpen(false)} />
             {isAdmin && (

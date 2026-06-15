@@ -1,5 +1,6 @@
 using FinanceTracker.Application.Features.Accruals;
 using FinanceTracker.Application.Features.Categories;
+using FinanceTracker.Application.Features.Dashboard;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,6 +15,7 @@ public static class DependencyInjection
 
         services.AddScoped<CategoryService>();
         services.AddScoped<AccrualService>();
+        services.AddScoped<DashboardService>();
 
         return services;
     }

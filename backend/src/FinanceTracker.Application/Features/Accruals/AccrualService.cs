@@ -12,7 +12,8 @@ namespace FinanceTracker.Application.Features.Accruals;
 public sealed class AccrualService(
     IApplicationDbContext db,
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    IDashboardCache dashboardCache)
 {
     public async Task<PagedResult<AccrualListItemDto>> GetPagedAsync(
         AccrualFilterRequest filter,
@@ -96,6 +97,7 @@ public sealed class AccrualService(
 
         db.Accruals.Add(accrual);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await dashboardCache.InvalidateAsync(userId, cancellationToken);
 
         return await GetByIdAsync(accrual.Id, cancellationToken);
     }
@@ -121,14 +123,17 @@ public sealed class AccrualService(
         accrual.SetTags(request.Tags ?? []);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await dashboardCache.InvalidateAsync(accrual.UserId, cancellationToken);
         return await GetByIdAsync(accrual.Id, cancellationToken);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var accrual = await LoadOwnedAsync(id, cancellationToken);
+        var ownerId = accrual.UserId;
         db.Accruals.Remove(accrual);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await dashboardCache.InvalidateAsync(ownerId, cancellationToken);
     }
 
     // ── Receipt items (T1.4.7) ────────────────────────────────────────────────
