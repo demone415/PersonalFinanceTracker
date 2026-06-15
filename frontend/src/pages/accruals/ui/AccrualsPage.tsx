@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   useAccruals,
   useCreateAccrual,
@@ -8,6 +8,11 @@ import {
   type AccrualListItem,
 } from '@/entities/accrual'
 import { AccrualForm, type AccrualFormValues } from '@/features/accrual-form'
+import {
+  FilterPanel,
+  filterToParams,
+  parseFilterFromParams,
+} from '@/features/accrual-filter'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/skeleton'
 
@@ -31,12 +36,25 @@ function formatAmount(item: AccrualListItem) {
 }
 
 export function AccrualsPage() {
-  const [filter, setFilter] = useState<AccrualFilter>({ page: 1, pageSize: 20 })
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter = useMemo<AccrualFilter>(
+    () => parseFilterFromParams(searchParams),
+    [searchParams],
+  )
   const [showForm, setShowForm] = useState(false)
 
   const { data, isPending } = useAccruals(filter)
   const createMutation = useCreateAccrual()
   const deleteMutation = useDeleteAccrual()
+
+  /** Replace filter fields (clearing pagination back to page 1) and sync URL. */
+  function applyFilter(fields: Omit<AccrualFilter, 'page' | 'pageSize'>) {
+    setSearchParams(filterToParams({ ...fields, pageSize: filter.pageSize }))
+  }
+
+  function goToPage(page: number) {
+    setSearchParams(filterToParams({ ...filter, page }))
+  }
 
   function handleCreate(values: AccrualFormValues) {
     createMutation.mutate(
@@ -82,6 +100,8 @@ export function AccrualsPage() {
           />
         </section>
       )}
+
+      <FilterPanel filter={filter} onApply={applyFilter} />
 
       {isPending ? (
         <ul className="space-y-2">
@@ -144,8 +164,8 @@ export function AccrualsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={filter.page === 1}
-                onClick={() => setFilter(f => ({ ...f, page: (f.page ?? 1) - 1 }))}
+                disabled={(filter.page ?? 1) === 1}
+                onClick={() => goToPage((filter.page ?? 1) - 1)}
               >
                 ← Пред.
               </Button>
@@ -155,8 +175,8 @@ export function AccrualsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={filter.page === data.totalPages}
-                onClick={() => setFilter(f => ({ ...f, page: (f.page ?? 1) + 1 }))}
+                disabled={(filter.page ?? 1) === data.totalPages}
+                onClick={() => goToPage((filter.page ?? 1) + 1)}
               >
                 След. →
               </Button>

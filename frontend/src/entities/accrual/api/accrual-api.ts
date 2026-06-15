@@ -10,12 +10,21 @@ import type {
   ReceiptItemInput,
 } from '../model/types'
 
+/**
+ * A `<input type="date">` yields a date-only string (`2026-06-16`) that the
+ * backend binds to midnight, which would exclude same-day accruals. Expand a
+ * date-only upper bound to the end of that day so the range stays inclusive.
+ */
+function inclusiveDateTo(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T23:59:59.999` : value
+}
+
 function toQueryString(filter: AccrualFilter): string {
   const params = new URLSearchParams()
   if (filter.page) params.set('page', String(filter.page))
   if (filter.pageSize) params.set('pageSize', String(filter.pageSize))
   if (filter.dateFrom) params.set('dateFrom', filter.dateFrom)
-  if (filter.dateTo) params.set('dateTo', filter.dateTo)
+  if (filter.dateTo) params.set('dateTo', inclusiveDateTo(filter.dateTo))
   if (filter.categoryId) params.set('categoryId', filter.categoryId)
   if (filter.amountMin != null) params.set('amountMin', String(filter.amountMin))
   if (filter.amountMax != null) params.set('amountMax', String(filter.amountMax))
