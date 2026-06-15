@@ -1,6 +1,8 @@
 using FinanceTracker.Api.Authentication;
+using FinanceTracker.Api.Common;
 using FinanceTracker.Api.Observability;
 using FinanceTracker.Api.RateLimiting;
+using FinanceTracker.Application;
 using FinanceTracker.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
@@ -18,20 +20,30 @@ builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfigurati
 // readiness probes (and later messaging, caching, background jobs, providers).
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Application layer: feature services + FluentValidation validators.
+builder.Services.AddApplication();
+
 // GoTrue JWT validation (T1.2.2): offline HS256 validation by the shared secret.
 builder.Services.AddGoTrueJwtAuthentication(builder.Configuration);
+
+// ProblemDetails responses + map application exceptions (404/403) to them.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 // Cross-cutting API concerns: rate limiting (T1.1.11) and metrics (T1.1.13).
 builder.Services.AddApiRateLimiting();
 builder.Services.AddObservability();
 
-builder.Services.AddControllers();
+// FluentValidation runs via a global action filter (see ValidationFilter).
+builder.Services.AddControllers(options => options.Filters.Add<ValidationFilter>());
 
 // OpenAPI document "v1" — matches the URL-segment API version (/api/v1).
 // Additional versions register their own document (e.g. AddOpenApi("v2")).
 builder.Services.AddOpenApi("v1");
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 app.UseSerilogRequestLogging();
 

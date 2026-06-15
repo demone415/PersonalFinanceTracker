@@ -750,10 +750,10 @@ jobs:
 - [x] T1.2.10 Rate-limit на login (защита от брутфорса / credential stuffing)
 
 **Story 1.3: Категории**
-- [ ] T1.3.1 Category entity + миграция + seed 12 категорий
-- [ ] T1.3.2 CRUD эндпоинты /api/v1/categories с FluentValidation
-- [ ] T1.3.3 Страница категорий: список + создание + редактирование + удаление
-- [ ] T1.3.4 Выбор иконки (Lucide) и цвета HEX в форме
+- [x] T1.3.1 Category entity + миграция + seed 12 категорий
+- [x] T1.3.2 CRUD эндпоинты /api/v1/categories с FluentValidation
+- [x] T1.3.3 Страница категорий: список + создание + редактирование + удаление
+- [x] T1.3.4 Выбор иконки (Lucide) и цвета HEX в форме
 
 **Story 1.4: Начисления (Accruals) CRUD**
 - [ ] T1.4.1 Accrual, ReceiptItem, AccrualTag entities + миграции
