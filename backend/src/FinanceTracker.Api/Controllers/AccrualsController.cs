@@ -59,7 +59,17 @@ public sealed class AccrualsController : ControllerBase
         Guid id,
         [FromServices] AccrualService service,
         CancellationToken cancellationToken) =>
-        service.GetOrCreateReceiptAsync(id, cancellationToken);
+        service.GetReceiptAsync(id, cancellationToken);
+
+    [HttpPost("{id:guid}/receipt")]
+    public async Task<ActionResult<ReceiptDto>> CreateReceipt(
+        Guid id,
+        [FromServices] AccrualService service,
+        CancellationToken cancellationToken)
+    {
+        var receipt = await service.GetOrCreateReceiptAsync(id, cancellationToken);
+        return CreatedAtAction(nameof(GetReceipt), new { id }, receipt);
+    }
 
     [HttpPost("{id:guid}/receipt/items")]
     public async Task<ActionResult<ReceiptItemDto>> AddReceiptItem(

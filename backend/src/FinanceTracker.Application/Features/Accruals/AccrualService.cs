@@ -133,6 +133,23 @@ public sealed class AccrualService(
 
     // ── Receipt items (T1.4.7) ────────────────────────────────────────────────
 
+    public async Task<ReceiptDto> GetReceiptAsync(
+        Guid accrualId,
+        CancellationToken cancellationToken = default)
+    {
+        var accrual = await LoadOwnedAsync(accrualId, cancellationToken);
+
+        if (!accrual.ReceiptId.HasValue)
+            throw new NotFoundException(nameof(Receipt), accrualId);
+
+        var receipt = await db.Receipts
+            .Include(r => r.Items)
+            .FirstOrDefaultAsync(r => r.Id == accrual.ReceiptId.Value, cancellationToken)
+            ?? throw new NotFoundException(nameof(Receipt), accrual.ReceiptId.Value);
+
+        return ToReceiptDto(receipt);
+    }
+
     public async Task<ReceiptDto> GetOrCreateReceiptAsync(
         Guid accrualId,
         CancellationToken cancellationToken = default)
@@ -149,7 +166,7 @@ public sealed class AccrualService(
         }
 
         var userId = currentUser.UserId!.Value;
-        var receipt = Receipt.CreateManual(userId, (long)(accrual.Amount * 100), accrual.Date);
+        var receipt = Receipt.CreateManual(userId, (long)Math.Round(accrual.Amount * 100m, MidpointRounding.AwayFromZero), accrual.Date);
         db.Receipts.Add(receipt);
         accrual.SetReceipt(receipt.Id);
         await unitOfWork.SaveChangesAsync(cancellationToken);

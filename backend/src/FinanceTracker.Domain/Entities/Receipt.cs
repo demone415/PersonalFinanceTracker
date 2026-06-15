@@ -69,22 +69,22 @@ public class Receipt : IUserOwnedEntity
 
     public void RemoveItem(ReceiptItem item) => _items.Remove(item);
 
+    /// <summary>Call once per provider invocation before MarkFetched/MarkFailed/ScheduleNextAttempt.</summary>
+    public void RecordAttempt() => FetchAttempts++;
+
     public void MarkFetched(string? rawMetadata)
     {
         FetchStatus = ReceiptFetchStatus.Fetched;
         RawMetadata = rawMetadata;
-        FetchAttempts++;
     }
 
     public void MarkFailed()
     {
-        FetchAttempts++;
         FetchStatus = FetchAttempts >= 5 ? ReceiptFetchStatus.RetryLimit : ReceiptFetchStatus.Failed;
     }
 
     public void ScheduleNextAttempt(DateTimeOffset nextFetchAt)
     {
-        FetchAttempts++;
         NextFetchAt = nextFetchAt;
     }
 }
