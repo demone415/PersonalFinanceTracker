@@ -20,6 +20,9 @@ export function HomePage() {
       </div>
       <div className="flex items-center gap-3">
         <Button asChild>
+          <Link to="/accruals">Начисления</Link>
+        </Button>
+        <Button variant="outline" asChild>
           <Link to="/categories">Категории</Link>
         </Button>
         {isAdmin && (
