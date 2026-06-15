@@ -1,23 +1,18 @@
 # Finance Tracker — local development stack.
 #
-# postgres + redis + rabbitmq + minio + backend + frontend.
-# Supabase GoTrue (auth) is added in T1.2.1. The production nginx reverse proxy
-# lives in docker-compose.prod.yml (T1.1.14).
+# All services start with a single:  docker compose up
 #
-# The `frontend` service is guarded by the `frontend` compose profile because the
-# frontend project is scaffolded in T1.1.7. Until then bring up the backend stack with:
-#     docker compose up
-# and (after T1.1.7) the full stack with:
-#     docker compose --profile frontend up
+# Startup order (via healthcheck depends_on):
+#   postgres → supabase-auth → backend (runs migrations + seeds data) → frontend
 
 services:
-  # ── PostgreSQL (Supabase image — ready for the auth.* schema in T1.2.1) ──
+  # ── PostgreSQL (Supabase image — includes the auth.* schema) ────────────────
   postgres:
     image: supabase/postgres:15.1.0.147
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-finance}
+      POSTGRES_DB:       ${POSTGRES_DB:-finance}
     ports:
       - "5432:5432"
     volumes:
@@ -28,7 +23,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── Redis (FusionCache backplane + rate-limit counters) ──
+  # ── Redis (FusionCache backplane + rate-limit counters) ──────────────────────
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
@@ -42,15 +37,15 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── RabbitMQ (Wolverine message bus + DLQ). Management console: internal only ──
+  # ── RabbitMQ (Wolverine message bus + DLQ) ───────────────────────────────────
   rabbitmq:
     image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # management UI (dev only; not exposed publicly in prod)
+      - "5672:5672"
+      - "15672:15672"   # management UI — dev only
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -59,18 +54,16 @@ services:
       timeout: 10s
       retries: 10
 
-  # ── MinIO (S3-compatible object storage; private bucket finance-files) ──
-  # Accessed via the AWS S3 SDK, so the backend is provider-agnostic. The bucket
-  # is created at app startup by S3BucketInitializer. Console: internal only.
+  # ── MinIO (S3-compatible; bucket `finance-files` created at app startup) ─────
   minio:
     image: minio/minio
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "9000:9000"     # S3 API
-      - "9001:9001"     # console (dev only; not exposed publicly in prod)
+      - "9000:9000"
+      - "9001:9001"     # console — dev only
     volumes:
       - minio-data:/data
     healthcheck:
@@ -79,44 +72,45 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── Supabase GoTrue (authentication; issues HS256 JWTs) ──
-  # Owns the auth.* schema in the finance DB and auto-migrates it on startup.
-  # The .NET API never calls GoTrue per request — it validates JWTs offline by
-  # the shared secret (see §11.1). Public signup is closed; emails auto-confirm.
+  # ── Supabase GoTrue (authentication; issues HS256 JWTs) ─────────────────────
+  # Serves at root on port 9999. The frontend nginx proxies /auth/v1/* → :9999/
+  # (strips the prefix). The .NET backend calls it internally at :9999/admin/*.
   supabase-auth:
     image: supabase/gotrue:v2.151.0
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      GOTRUE_API_HOST: 0.0.0.0
-      PORT: "9999"
-      API_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL:-http://localhost:9999}
-      GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-finance}?search_path=auth"
-      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
-      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
-      GOTRUE_JWT_ISSUER: "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
-      GOTRUE_JWT_AUD: authenticated
-      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_API_HOST:              0.0.0.0
+      PORT:                         "9999"
+      API_EXTERNAL_URL:             ${GOTRUE_EXTERNAL_URL:-http://localhost:9999}
+      GOTRUE_DB_DRIVER:             postgres
+      GOTRUE_DB_DATABASE_URL:       "postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-finance}?search_path=auth"
+      GOTRUE_SITE_URL:              ${GOTRUE_SITE_URL:-http://localhost:3000}
+      GOTRUE_JWT_SECRET:            ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      GOTRUE_JWT_ISSUER:            "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
+      GOTRUE_JWT_AUD:               authenticated
+      GOTRUE_JWT_EXP:               "3600"
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
-      GOTRUE_JWT_ADMIN_ROLES: service_role
-      # Public signup closed (T1.2.9): users are created by admin via Admin API.
-      # Emails auto-confirm, captcha stays off (GOTRUE_SECURITY_CAPTCHA_ENABLED
-      # defaults to false).
-      GOTRUE_DISABLE_SIGNUP: "true"
-      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_JWT_ADMIN_ROLES:       service_role
+      GOTRUE_DISABLE_SIGNUP:        "true"
+      GOTRUE_MAILER_AUTOCONFIRM:    "true"
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
-      # Login brute-force / credential-stuffing protection (T1.2.10): the /token
-      # endpoint (password grant + refresh) is rate-limited per client IP. The IP
-      # is taken from this header, which the edge proxy sets (and must strip from
-      # client input in production).
-      GOTRUE_RATE_LIMIT_HEADER: X-Forwarded-For
+      GOTRUE_RATE_LIMIT_HEADER:     X-Forwarded-For
       GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "30"
     ports:
       - "9999:9999"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
 
-  # ── Backend (.NET 10 API) ──
+  # ── Backend (.NET 10 API) ─────────────────────────────────────────────────────
+  # Waits for GoTrue to be healthy, then runs EF migrations + seeds data before
+  # starting to accept requests. Health probe starts after start_period to allow
+  # time for seeding on first run.
   backend:
     build:
       context: ./backend
@@ -130,39 +124,48 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      supabase-auth:
+        condition: service_healthy
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_ENVIRONMENT:    ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-finance};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
-      ConnectionStrings__Redis: "redis:6379"
-      RabbitMq__Host: rabbitmq
-      RabbitMq__Username: ${RABBITMQ_USER:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
-      S3__Endpoint: "http://minio:9000"
-      S3__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
-      S3__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      S3__BucketName: finance-files
-      Supabase__JwtSecret: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
-      Supabase__Issuer: "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
-      Supabase__Audience: authenticated
+      ConnectionStrings__Redis:  "redis:6379"
+      RabbitMq__Host:            rabbitmq
+      RabbitMq__Username:        ${RABBITMQ_USER:-guest}
+      RabbitMq__Password:        ${RABBITMQ_PASSWORD:-guest}
+      S3__Endpoint:              "http://minio:9000"
+      S3__AccessKey:             ${MINIO_ROOT_USER:-minioadmin}
+      S3__SecretKey:             ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3__BucketName:            finance-files
+      Supabase__JwtSecret:       ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      Supabase__Issuer:          "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
+      Supabase__Audience:        authenticated
+      # Internal URL used by DatabaseSeeder to call the GoTrue Admin API
+      Supabase__AdminApiUrl:     "http://supabase-auth:9999"
     ports:
       - "5000:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
 
-  # ── Frontend (React SPA) — enable with: docker compose --profile frontend up ──
+  # ── Frontend (React SPA via nginx) ───────────────────────────────────────────
+  # Waits for backend to be healthy (migrations + seed done) before starting.
   frontend:
-    profiles: ["frontend"]
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # VITE_* are baked at build time, so pass as a build arg, not runtime env.
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
-        # supabase-js appends /auth/v1; point it at the SPA origin, where nginx
-        # proxies /auth/v1/* to standalone GoTrue (same-origin, no CORS).
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:3000}
+        VITE_API_URL:          ${VITE_API_URL:-http://localhost:5000}
+        VITE_SUPABASE_URL:     ${VITE_SUPABASE_URL:-http://localhost:3000}
         VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-local-anon-key}
     depends_on:
-      - backend
-      - supabase-auth
+      backend:
+        condition: service_healthy
+      supabase-auth:
+        condition: service_healthy
     ports:
       - "3000:80"
 

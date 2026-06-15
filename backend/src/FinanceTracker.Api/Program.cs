@@ -4,6 +4,7 @@ using FinanceTracker.Api.Observability;
 using FinanceTracker.Api.RateLimiting;
 using FinanceTracker.Application;
 using FinanceTracker.Infrastructure;
+using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 using Serilog;
@@ -84,6 +85,11 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapPrometheusScrapingEndpoint();
 
 app.MapGet("/", () => "FinanceTracker API");
+
+// Run EF migrations and seed initial data before accepting requests.
+await DatabaseSeeder.SeedAsync(
+    app.Configuration,
+    app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Seeder"));
 
 app.Run();
 

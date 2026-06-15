@@ -1,7 +1,7 @@
 Начало работы: вечер 2026-06-10
 
 Использую Claude Code через Claude Desktop
-Модель почти везде `Sonnet 4.8 / effort = High`
+Модель почти везде `Sonnet 4.6 / effort = High`. Иногда `Opus 4.8`, если нужен больший контекст
 
 Плагины: 
 - [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills)
@@ -118,8 +118,26 @@ The hook is now disabled. Let me write the remaining csproj files cleanly:
 После реализации аутентификации и создания всех инфры решил запустить проект.
 Клод сразу нашел баг с путями auth в supabase. Фронт смотрел не туда. Клод бодро починил. [PR#4](https://github.com/demone415/PersonalFinanceTracker/pull/4). Все корректно запустилось, авторизоваться смог (был отдельный admin аккаунт с only-admin route)
 
+После реализации `Story 1.4: Начисления (Accruals) CRUD` решил свериться с планом разработки и соответствию требованиям. Клод отверьюил свой же ПР и выяснилось, что он пропустил важные части.
 
+| # | Severity | Issue |
+|---|----------|-------|
+| 1 | 🔴 Bug | GET endpoint auto-creates Receipt (violates REST idempotency) |
+| 2 | 🔴 Bug | `FetchAttempts` double-counted → premature `RetryLimit` |
+| 3 | 🔴 Bug | Kopeck conversion truncates decimal amounts |
+| 4 | 🟡 Missing | `RowVersion` on `Accrual` (required by ARCHITECTURE.md) |
+| 5 | 🟡 Missing | `Idempotency-Key` header deduplication (required by ARCHITECTURE.md) |
+| 6 | 🟡 Missing | Frontend optimistic updates (T1.4.6 requirement) |
+| 7 | 🟠 Quality | Dead `ChangeLog` entry in interceptor's `TrackedTypes` |
+| 8 | 🟠 Quality | `GetOrLoadReceiptAsync` — redundant double DB round trip |
+| 9 | 🟠 Quality | `UserId` exposed in `AccrualDto` unnecessarily |
+| 10 | 🟠 Quality | `useState` import at bottom of `AccrualForm.tsx` |
 
+**Recommend fixing #1–3 before merge** (runtime bugs). Items #4–5 can follow in a dedicated task since they require schema changes. #6 is story-level completeness. #7–10 are polish.
 
+---
 
+На реализации Начислений (1.4) клод что-то намутил с историей гита (что-то не докомитил, использовал squash).
+
+Заметил, что Sonnet 4.6 постоянно забывает правила, которые лежат в долгосрочной памяти (я просил его запомнить, и он записал в MEMORY.md). Вероятно, из-за размера контекста и его контекстного окна. Возможно, далее придется использовать Opus 4.8.
 
