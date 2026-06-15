@@ -1,17 +1,22 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using FinanceTracker.Application.Common.Interfaces;
+using FinanceTracker.Infrastructure.Caching;
 using FinanceTracker.Infrastructure.Identity;
 using FinanceTracker.Infrastructure.Persistence;
 using FinanceTracker.Infrastructure.Persistence.Interceptors;
 using FinanceTracker.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
+using ZiggyCreatures.Caching.Fusion;
+using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
+using ZiggyCreatures.Caching.Fusion.Serialization.SystemTextJson;
 
 namespace FinanceTracker.Infrastructure;
 
@@ -48,9 +53,51 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         AddObjectStorage(services, configuration);
+        AddCaching(services, configuration);
         AddHealthChecks(services, configuration, connectionString);
 
         return services;
+    }
+
+    /// <summary>
+    /// FusionCache (in-memory L1 + Redis L2 distributed cache + Redis backplane)
+    /// for dashboard aggregates (T2.1.5). 5-minute TTL with fail-safe so a Redis
+    /// outage degrades to memory-only rather than failing requests; cache
+    /// stampede protection is built in. Tagging lets us invalidate every cached
+    /// aggregate for a user in one call (see <see cref="FusionCacheDashboardCache"/>).
+    /// </summary>
+    private static void AddCaching(IServiceCollection services, IConfiguration configuration)
+    {
+        var redisConnection = configuration.GetConnectionString("Redis") ?? "localhost:6379";
+
+        services.AddFusionCache()
+            .WithDefaultEntryOptions(new FusionCacheEntryOptions
+            {
+                Duration = TimeSpan.FromMinutes(5),
+
+                // Fail-safe: serve a stale value (and keep working) if the factory
+                // or the distributed cache is briefly unavailable.
+                IsFailSafeEnabled = true,
+                FailSafeMaxDuration = TimeSpan.FromHours(1),
+                FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
+
+                // Cap how long the DB aggregation may block a request before the
+                // stale value (if any) is returned and the refresh continues in
+                // the background.
+                FactorySoftTimeout = TimeSpan.FromMilliseconds(500),
+
+                // Don't let a slow/unavailable Redis stall the request.
+                DistributedCacheSoftTimeout = TimeSpan.FromSeconds(1),
+                DistributedCacheHardTimeout = TimeSpan.FromSeconds(2),
+                AllowBackgroundDistributedCacheOperations = true,
+            })
+            .WithSerializer(new FusionCacheSystemTextJsonSerializer())
+            .WithDistributedCache(
+                new RedisCache(new RedisCacheOptions { Configuration = redisConnection }))
+            .WithBackplane(
+                new RedisBackplane(new RedisBackplaneOptions { Configuration = redisConnection }));
+
+        services.AddScoped<IDashboardCache, FusionCacheDashboardCache>();
     }
 
     /// <summary>

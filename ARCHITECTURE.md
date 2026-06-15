@@ -769,18 +769,18 @@ jobs:
 ### Epic 2: Дашборд и визуализация
 
 **Story 2.1: Dashboard endpoints**
-- [ ] T2.1.1 GET /dashboard/summary (общий баланс, доходы/расходы за месяц)
-- [ ] T2.1.2 GET /dashboard/expenses-by-category (данные для круговой диаграммы)
-- [ ] T2.1.3 GET /dashboard/monthly-dynamics (6 месяцев)
-- [ ] T2.1.4 GET /dashboard/top-categories (топ-5)
-- [ ] T2.1.5 Кэширование ответов Dashboard через FusionCache (TTL 5 мин), ключи **с UserId**; инвалидация при изменении начислений
+- [x] T2.1.1 GET /dashboard/summary (общий баланс, доходы/расходы за месяц)
+- [x] T2.1.2 GET /dashboard/expenses-by-category (данные для круговой диаграммы)
+- [x] T2.1.3 GET /dashboard/monthly-dynamics (6 месяцев)
+- [x] T2.1.4 GET /dashboard/top-categories (топ-5)
+- [x] T2.1.5 Кэширование ответов Dashboard через FusionCache (TTL 5 мин), ключи **с UserId**; инвалидация при изменении начислений
 
 **Story 2.2: Dashboard UI**
-- [ ] T2.2.1 Страница Dashboard с компоновкой виджетов
-- [ ] T2.2.2 PieChart расходов по категориям (Recharts)
-- [ ] T2.2.3 LineChart динамики за 6 месяцев (Recharts)
-- [ ] T2.2.4 Топ-5 категорий (горизонтальный BarChart)
-- [ ] T2.2.5 Сводные карточки (доход, расход, баланс месяца)
+- [x] T2.2.1 Страница Dashboard с компоновкой виджетов
+- [x] T2.2.2 PieChart расходов по категориям (Recharts)
+- [x] T2.2.3 LineChart динамики за 6 месяцев (Recharts)
+- [x] T2.2.4 Топ-5 категорий (горизонтальный BarChart)
+- [x] T2.2.5 Сводные карточки (доход, расход, баланс месяца)
 
 ---
 
