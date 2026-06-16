@@ -34,12 +34,15 @@ const HIDDEN_KEYS = new Set(['xmin', 'Id', 'UserId'])
 
 type Snapshot = Record<string, unknown>
 
-function parse(json?: string | null): Snapshot | null {
+/** Returned when a snapshot string is present but not valid JSON (vs. legitimately absent). */
+const CORRUPT = Symbol('corrupt-snapshot')
+
+function parse(json?: string | null): Snapshot | null | typeof CORRUPT {
   if (!json) return null
   try {
     return JSON.parse(json) as Snapshot
   } catch {
-    return null
+    return CORRUPT
   }
 }
 
@@ -68,6 +71,11 @@ function diffRows(before: Snapshot | null, after: Snapshot | null) {
 function EntryDetails({ entry }: { entry: ChangeLogEntry }) {
   const before = parse(entry.valuesBefore)
   const after = parse(entry.valuesAfter)
+
+  if (before === CORRUPT || after === CORRUPT) {
+    return <p className="text-xs text-red-500">Снимок повреждён — не удалось разобрать JSON.</p>
+  }
+
   const rows = diffRows(before, after)
 
   if (rows.length === 0) {
@@ -105,6 +113,7 @@ function EntryRow({ entry }: { entry: ChangeLogEntry }) {
       <button
         type="button"
         className="flex w-full items-center justify-between gap-4 text-left"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         <div className="min-w-0">

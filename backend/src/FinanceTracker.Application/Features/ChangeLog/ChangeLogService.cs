@@ -29,7 +29,10 @@ public sealed class ChangeLogService(IApplicationDbContext db)
         var pageSize = Math.Clamp(filter.PageSize, 1, 100);
 
         var items = await query
+            // Tie-break on Id (GUID v7, time-ordered): rows written in one SaveChanges
+            // share a Timestamp, so without it pagination order would be non-deterministic.
             .OrderByDescending(c => c.Timestamp)
+            .ThenByDescending(c => c.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(c => new ChangeLogDto(

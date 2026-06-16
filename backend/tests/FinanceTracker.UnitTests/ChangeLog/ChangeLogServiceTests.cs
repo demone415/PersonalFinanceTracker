@@ -131,4 +131,34 @@ public class ChangeLogServiceTests
             .GetPagedAsync(new ChangeLogFilterRequest(Page: 2, PageSize: 2));
         Assert.Equal("Create", Assert.Single(page2.Items).Action);
     }
+
+    [Fact]
+    public async Task GetPaged_ClampsPageAndPageSize()
+    {
+        const string db = nameof(GetPaged_ClampsPageAndPageSize);
+        Seed(db,
+            Log(User, "Accrual", "Create", T0),
+            Log(User, "Accrual", "Update", T0.AddMinutes(1)),
+            Log(User, "Accrual", "Delete", T0.AddMinutes(2)));
+
+        using var ctx = NewContext(new StubCurrentUser(User, IsAdmin: false), db);
+
+        // Page < 1 is normalised to the first page (newest row first).
+        var firstPage = await new ChangeLogService(ctx)
+            .GetPagedAsync(new ChangeLogFilterRequest(Page: 0, PageSize: 2));
+        Assert.Equal(1, firstPage.Page);
+        Assert.Equal("Delete", firstPage.Items[0].Action);
+
+        // PageSize above the cap is clamped to 100 (all three rows fit on one page).
+        var huge = await new ChangeLogService(ctx)
+            .GetPagedAsync(new ChangeLogFilterRequest(Page: 1, PageSize: 1000));
+        Assert.Equal(100, huge.PageSize);
+        Assert.Equal(3, huge.Items.Count);
+
+        // PageSize below 1 is clamped up to 1.
+        var tiny = await new ChangeLogService(ctx)
+            .GetPagedAsync(new ChangeLogFilterRequest(Page: 1, PageSize: 0));
+        Assert.Equal(1, tiny.PageSize);
+        Assert.Single(tiny.Items);
+    }
 }
