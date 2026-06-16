@@ -2,6 +2,7 @@ using FinanceTracker.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FinanceTracker.Api.Common;
 
@@ -20,6 +21,10 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
             ForbiddenAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
+            ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
+            // Optimistic-lock failure (xmin token, ARCHITECTURE.md §4) — the row
+            // changed under us; the client should refetch and retry.
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "Conflict"),
             FeatureDisabledException => (StatusCodes.Status503ServiceUnavailable, "Feature Disabled"),
             _ => (0, string.Empty),
         };

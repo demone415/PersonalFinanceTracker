@@ -4,6 +4,7 @@ import { DashboardPage } from '@/pages/dashboard'
 import { LoginPage } from '@/pages/login'
 import { AdminPage } from '@/pages/admin'
 import { CategoriesPage } from '@/pages/categories'
+import { BudgetsPage } from '@/pages/budgets'
 import { AccrualsPage } from '@/pages/accruals'
 import { AccrualDetailPage } from '@/pages/accrual-detail'
 import { ScanPage } from '@/pages/scan'
@@ -28,7 +29,7 @@ export const router = createBrowserRouter([
           { path: '/accruals', element: <AccrualsPage /> },
           { path: '/accruals/:id', element: <AccrualDetailPage /> },
           { path: '/categories', element: <CategoriesPage /> },
-          { path: '/budgets', element: <ComingSoonPage title="Бюджеты" /> },
+          { path: '/budgets', element: <BudgetsPage /> },
           { path: '/journal', element: <ComingSoonPage title="Журнал изменений" /> },
           { path: '/scan', element: <ScanPage /> },
           {
