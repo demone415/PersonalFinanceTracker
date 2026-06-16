@@ -46,7 +46,21 @@ public sealed class ProfileService(
         {
             profile = new UserProfile(userId);
             db.UserProfiles.Add(profile);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // A concurrent first request inserted the row between our read and
+                // write (PK = userId). Discard our duplicate (Added → Detached) and
+                // load the now-existing profile instead of surfacing a 500.
+                db.UserProfiles.Remove(profile);
+                profile = await db.UserProfiles
+                    .FirstOrDefaultAsync(p => p.Id == userId, cancellationToken);
+                if (profile is null)
+                    throw;
+            }
         }
 
         return profile;

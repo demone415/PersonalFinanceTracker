@@ -21,6 +21,7 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
             ForbiddenAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
+            ValidationException => (StatusCodes.Status400BadRequest, "Bad Request"),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
             // Optimistic-lock failure (xmin token, ARCHITECTURE.md §4) — the row
             // changed under us; the client should refetch and retry.

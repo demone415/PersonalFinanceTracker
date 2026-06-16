@@ -36,11 +36,11 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
     setValue,
     setError,
     clearErrors,
-    formState: { errors },
+    formState: { errors, dirtyFields },
   } = useForm<AccrualFormValues>({
     resolver: zodResolver(accrualSchema),
     defaultValues: {
-      currency: 'RUB',
+      currency: baseCurrency,
       includeInStats: true,
       type: 'Expense',
       tags: [],
@@ -49,6 +49,17 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
   })
 
   const tags = watch('tags') ?? []
+
+  // In create mode the transaction currency should follow the user's base
+  // currency, which may still be loading on first render; keep it in sync until
+  // the user edits the field. In edit mode defaultValues carries the saved
+  // currency, so leave it untouched.
+  const isEdit = defaultValues?.currency != null
+  useEffect(() => {
+    if (!isEdit && !dirtyFields.currency) {
+      setValue('currency', baseCurrency)
+    }
+  }, [isEdit, baseCurrency, dirtyFields.currency, setValue])
 
   // Multi-currency (Epic 8): a foreign transaction needs the rate to the base
   // currency captured at entry time so aggregates can convert it (T8.1.3).

@@ -31,8 +31,8 @@ export function formatMoney(value: number, currency = 'RUB'): string {
 
 /**
  * Currency-aware compact amount for chart axes/labels in the base currency
- * (Epic 8), e.g. `12 тыс. ₽` or `12K $`. Falls back to the ISO code for unknown
- * currencies.
+ * (Epic 8), e.g. `12 тыс. ₽` or `12 тыс. $`. Falls back to the ISO code for
+ * unknown currencies.
  */
 export function formatMoneyCompact(value: number, currency = 'RUB'): string {
   try {

@@ -1,10 +1,13 @@
+using FinanceTracker.Application.Common.Exceptions;
 using FinanceTracker.Application.Common.Interfaces;
+using FinanceTracker.Application.Features.Accruals;
 using FinanceTracker.Application.Features.Budgets;
 using FinanceTracker.Application.Features.Dashboard;
 using FinanceTracker.Domain.Entities;
 using FinanceTracker.Domain.Enums;
 using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FinanceTracker.UnitTests.Currency;
 
@@ -131,5 +134,76 @@ public class CurrencyConversionTests
         Assert.Equal(5_000m, groceries.SpentAmount);
         Assert.Equal(5_000m, groceries.RemainingAmount);
         Assert.Equal(50d, groceries.Percentage);
+    }
+
+    // ── Foreign-currency rate enforcement (the API is the source of truth) ───────
+
+    private static AccrualService NewAccrualService(AppDbContext ctx) =>
+        new(ctx, new NoopUnitOfWork(ctx), ctx.CurrentUser, new PassThroughCache(),
+            NullLogger<AccrualService>.Instance);
+
+    private static CreateAccrualRequest CreateRequest(string currency, decimal? exchangeRate) =>
+        new(100m, On(2026, 6, 1), AccrualType.Expense, currency,
+            CategoryId: null, Description: null, IncludeInStats: true, GroupId: null,
+            ExchangeRate: exchangeRate, Tags: []);
+
+    [Fact]
+    public async Task Create_ForeignCurrencyWithoutRate_IsRejected()
+    {
+        const string db = nameof(Create_ForeignCurrencyWithoutRate_IsRejected);
+        using var ctx = NewContext(new StubCurrentUser(User, IsAdmin: false), db);
+        var service = NewAccrualService(ctx);
+
+        // No profile → base currency defaults to RUB, so USD without a rate is foreign.
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.CreateAsync(CreateRequest("USD", exchangeRate: null)));
+        Assert.False(await ctx.Accruals.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Create_ForeignCurrencyWithRate_IsAccepted()
+    {
+        const string db = nameof(Create_ForeignCurrencyWithRate_IsAccepted);
+        using var ctx = NewContext(new StubCurrentUser(User, IsAdmin: false), db);
+        var service = NewAccrualService(ctx);
+
+        var created = await service.CreateAsync(CreateRequest("USD", exchangeRate: 90m));
+
+        Assert.Equal("USD", created.Currency);
+        Assert.Equal(90m, created.ExchangeRate);
+    }
+
+    [Fact]
+    public async Task Create_BaseCurrencyWithoutRate_IsAccepted()
+    {
+        const string db = nameof(Create_BaseCurrencyWithoutRate_IsAccepted);
+        using var ctx = NewContext(new StubCurrentUser(User, IsAdmin: false), db);
+        var service = NewAccrualService(ctx);
+
+        var created = await service.CreateAsync(CreateRequest("RUB", exchangeRate: null));
+
+        Assert.Equal("RUB", created.Currency);
+        Assert.Null(created.ExchangeRate);
+    }
+
+    [Fact]
+    public async Task Create_HonoursProfileBaseCurrency_WhenNotRub()
+    {
+        const string db = nameof(Create_HonoursProfileBaseCurrency_WhenNotRub);
+        using (var seed = NewContext(new StubCurrentUser(User, IsAdmin: false), db))
+        {
+            seed.UserProfiles.Add(new UserProfile(User, displayName: null, currency: "USD"));
+            await seed.SaveChangesAsync();
+        }
+
+        using var ctx = NewContext(new StubCurrentUser(User, IsAdmin: false), db);
+        var service = NewAccrualService(ctx);
+
+        // USD is now the base — no rate needed; RUB has become the foreign currency.
+        var usd = await service.CreateAsync(CreateRequest("USD", exchangeRate: null));
+        Assert.Equal("USD", usd.Currency);
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => service.CreateAsync(CreateRequest("RUB", exchangeRate: null)));
     }
 }
