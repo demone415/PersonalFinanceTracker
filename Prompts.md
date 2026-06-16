@@ -446,3 +446,7 @@ fix `Medium — cache invalidation can fail a successful write`
 
 ---
 
+/goal Сделай Epic 7: Лог изменений. Проверь, что реализация соответствует требованиям из документации
+
+---
+
