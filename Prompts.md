@@ -372,6 +372,41 @@ Tailwind + shadcn/ui устраивает
 
 ---
 
-
+/review
 
 ---
+
+fix `Medium — cache invalidation can fail a successful write`
+
+---
+
+Мержи
+
+---
+
+/goal Сделай Epic 3: Фильтрация и поиск
+
+---
+
+> [!note] Увидел, что в плагинах есть другой скилл ревью. Решил попробовать
+
+/ecc:review-pr #11
+
+---
+
+Мержи
+
+---
+
+/goal Переходим к Story 4.1: Провайдер ПроверкаЧека. Документация API в proverka_cheka_documentation_api.docx
+
+---
+
+/ecc:code-review #12 
+
+---
+
+Закомить промпты и мержи
+
+---
+
