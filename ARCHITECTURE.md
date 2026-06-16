@@ -804,10 +804,10 @@ jobs:
 - [x] T4.1.6 Добавить `Receipt.UserId` + per-user дневной cap на запросы к провайдеру
 
 **Story 4.2: Фоновая обработка чеков**
-- [ ] T4.2.1 Wolverine message `ReceiptFetchRequested` + consumer handler; DLQ для терминальных ошибок
-- [ ] T4.2.2 Глобальная FIFO-очередь `receipts` (`WorkerCount = 1`, последовательная обработка) + round-robin между юзерами
-- [ ] T4.2.3 Hangfire job `ReceiptFetchJob` с Schedule (схема 2: +6ч, +1д, +3д, +10д); идемпотентность по `FetchStatus`
-- [ ] T4.2.4 Обновление `Receipt.FetchStatus` после успеха/ошибки/лимита; перевод в `RetryLimit` → DLQ
+- [x] T4.2.1 Wolverine message `ReceiptFetchRequested` + consumer handler; DLQ для терминальных ошибок
+- [x] T4.2.2 Глобальная FIFO-очередь `receipts` (`WorkerCount = 1`, последовательная обработка) + round-robin между юзерами
+- [x] T4.2.3 Hangfire job `ReceiptFetchJob` с Schedule (схема 2: +6ч, +1д, +3д, +10д); идемпотентность по `FetchStatus`
+- [x] T4.2.4 Обновление `Receipt.FetchStatus` после успеха/ошибки/лимита; перевод в `RetryLimit` → DLQ
 
 **Story 4.3: Сканер на фронтенде**
 - [ ] T4.3.1 QrScanner компонент (камера через @zxing/browser + загрузка файла)

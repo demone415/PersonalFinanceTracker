@@ -22,6 +22,22 @@
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
   </ItemGroup>
+  <!-- Messaging: Wolverine over RabbitMQ (message bus + DLQ). Core + RabbitMQ
+       transport only; durable Postgres outbox is deferred to keep Npgsql aligned
+       on v10 (Weasel.Postgresql still pins Npgsql 9). Durability instead comes
+       from the Receipt row + the recurring dispatcher, so a lost "wake-up"
+       message is self-healed. -->
+  <ItemGroup>
+    <PackageVersion Include="WolverineFx" Version="6.10.0" />
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.10.0" />
+  </ItemGroup>
+  <!-- Background jobs: Hangfire with PostgreSQL persistence (FIFO receipts queue,
+       WorkerCount = 1, scheduled retries via BackgroundJob.Schedule). -->
+  <ItemGroup>
+    <PackageVersion Include="Hangfire.Core" Version="1.8.23" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.23" />
+    <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
+  </ItemGroup>
   <!-- Persistence: EF Core 10 + Npgsql provider -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />

@@ -23,6 +23,7 @@ internal sealed class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
         builder.Property(r => r.ExternalNumber).HasMaxLength(32);
         builder.Property(r => r.FetchStatus).IsRequired();
         builder.Property(r => r.FetchAttempts).IsRequired();
+        builder.Property(r => r.QrRaw).HasMaxLength(512);
 
         builder.HasMany(r => r.Items)
             .WithOne()
@@ -30,6 +31,9 @@ internal sealed class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(r => r.UserId);
-        builder.HasIndex(r => r.FetchStatus);
+
+        // The dispatcher polls for due work: Pending receipts ordered by when the
+        // next attempt is allowed. A composite index keeps that scan cheap.
+        builder.HasIndex(r => new { r.FetchStatus, r.NextFetchAt });
     }
 }

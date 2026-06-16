@@ -50,4 +50,14 @@
     <PackageReference Include="RabbitMQ.Client" />
   </ItemGroup>
 
+  <!-- Messaging (Wolverine over RabbitMQ) + background jobs (Hangfire/PostgreSQL):
+       the receipt-fetch consumer, the FIFO `receipts` queue and scheduled retries. -->
+  <ItemGroup>
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.PostgreSql" />
+  </ItemGroup>
+
 </Project>

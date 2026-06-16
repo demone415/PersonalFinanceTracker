@@ -13,7 +13,9 @@ public class ReceiptMapperTests
     private static readonly Guid UserId = Guid.Parse("00000000-0000-0000-0000-0000000000a1");
 
     private static Receipt NewPendingReceipt() =>
-        new(UserId, amountInKopecks: 34993, date: new DateTimeOffset(2020, 9, 24, 18, 37, 0, TimeSpan.Zero),
+        Receipt.CreateForQrScan(UserId, amountInKopecks: 34993,
+            date: new DateTimeOffset(2020, 9, 24, 18, 37, 0, TimeSpan.Zero),
+            qrRaw: "t=20200924T1837&s=349.93&fn=9282440300682838&i=46534&fp=1273019065&n=1",
             fd: 46534, fn: "9282440300682838", fpd: "1273019065");
 
     private static ReceiptData SampleData() => new(
