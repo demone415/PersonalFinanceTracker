@@ -17,6 +17,7 @@ public sealed class ChangeLogInterceptor(ICurrentUserService currentUser) : Save
     private static readonly HashSet<Type> TrackedTypes =
     [
         typeof(Accrual),
+        typeof(MonthlyBudget), // Подготовка.md: budget changes are logged too
         typeof(ChangeLog), // excluded below — prevents recursion
     ];
 

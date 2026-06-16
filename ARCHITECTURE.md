@@ -111,6 +111,14 @@ Accrual
 └── CreatedAt          DateTimeOffset
 ```
 
+> **Контракт агрегации по валюте.** Пока мультивалютность не реализована (Epic 8),
+> все агрегаты (дашборд, прогресс бюджетов) суммируют `Amount` **как есть** —
+> считается, что значение хранится в основной валюте пользователя. `Currency` и
+> `ExchangeRate` несут сведения об исходной транзакции и в суммировании **не**
+> участвуют. Когда появится конвертация (T8.1.4), её нужно применить **во всех**
+> местах агрегации сразу — `DashboardService` и `BudgetService.GetProgressAsync`, —
+> иначе цифры разойдутся.
+
 ### Receipt (чек)
 ```csharp
 Receipt
@@ -226,7 +234,7 @@ PATCH /auth/v1/admin/users/{userId}
 ChangeLog
 ├── Id                 Guid
 ├── UserId             Guid
-├── EntityType         string       "Accrual" | "Budget" | ...
+├── EntityType         string       "Accrual" | "MonthlyBudget" | ...
 ├── EntityId           Guid
 ├── Action             string       "Create" | "Update" | "Delete"
 ├── Timestamp          DateTimeOffset
@@ -819,11 +827,11 @@ jobs:
 ### Epic 5: Месячные бюджеты
 
 **Story 5.1: Бюджеты**
-- [ ] T5.1.1 Budget entity + миграция + seed 3 бюджета
-- [ ] T5.1.2 CRUD эндпоинты /api/v1/budgets с FluentValidation
-- [ ] T5.1.3 GET /budgets/progress — расчёт процента расхода бюджета
-- [ ] T5.1.4 Страница бюджетов с прогресс-барами по категориям
-- [ ] T5.1.5 Форма создания/редактирования бюджета
+- [x] T5.1.1 Budget entity + миграция + seed 3 бюджета
+- [x] T5.1.2 CRUD эндпоинты /api/v1/budgets с FluentValidation
+- [x] T5.1.3 GET /budgets/progress — расчёт процента расхода бюджета
+- [x] T5.1.4 Страница бюджетов с прогресс-барами по категориям
+- [x] T5.1.5 Форма создания/редактирования бюджета
 
 ---
 
@@ -856,7 +864,7 @@ jobs:
 - [ ] T8.1.1 Поля Currency + ExchangeRate в Accrual entity
 - [ ] T8.1.2 Выбор основной валюты в профиле пользователя
 - [ ] T8.1.3 Хранение курса на момент транзакции
-- [ ] T8.1.4 Конвертация в дашборде (в основную валюту)
+- [ ] T8.1.4 Конвертация в основную валюту во **всех** агрегатах — дашборд **и** прогресс бюджетов (`BudgetService.GetProgressAsync`); см. «Контракт агрегации по валюте» у Accrual
 
 ---
 
