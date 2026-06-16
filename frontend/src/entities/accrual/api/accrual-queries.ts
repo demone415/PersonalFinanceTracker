@@ -8,7 +8,11 @@ const KEYS = {
   listFiltered: (filter: AccrualFilter) => ['accruals', 'list', filter] as const,
   detail: (id: string) => ['accruals', id] as const,
   receipt: (id: string) => ['accruals', id, 'receipt'] as const,
+  receiptStatus: (id: string) => ['accruals', id, 'receipt-status'] as const,
 }
+
+/** Terminal fetch states — once reached, the receipt-status no longer changes. */
+const TERMINAL_STATUSES = new Set(['Fetched', 'Failed', 'RetryLimit'])
 
 export function useAccruals(filter: AccrualFilter = {}) {
   return useQuery({
@@ -30,6 +34,30 @@ export function useReceipt(accrualId: string) {
     queryKey: KEYS.receipt(accrualId),
     queryFn: () => accrualApi.getReceipt(accrualId),
     enabled: !!accrualId,
+  })
+}
+
+/** Submit a scanned QR string (T4.3.2). Refreshes lists so the new accrual appears. */
+export function useScanQr() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (qrRaw: string) => accrualApi.scanQr(qrRaw),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.all }),
+  })
+}
+
+/**
+ * Polls the async receipt-fetch progress (T4.3.3). Refetches every few seconds
+ * while `Pending`, then stops once a terminal status (Fetched/Failed/RetryLimit)
+ * is reached so we don't poll the backend forever.
+ */
+export function useReceiptStatus(accrualId: string | undefined) {
+  return useQuery({
+    queryKey: KEYS.receiptStatus(accrualId ?? '_'),
+    queryFn: () => accrualApi.getReceiptStatus(accrualId!),
+    enabled: !!accrualId,
+    refetchInterval: (query) =>
+      query.state.data && TERMINAL_STATUSES.has(query.state.data.fetchStatus) ? false : 3000,
   })
 }
 

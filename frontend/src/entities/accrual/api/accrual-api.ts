@@ -8,6 +8,8 @@ import type {
   Receipt,
   ReceiptItem,
   ReceiptItemInput,
+  ReceiptStatus,
+  ScanQrResult,
 } from '../model/types'
 
 /**
@@ -46,6 +48,17 @@ export const accrualApi = {
     http<Accrual>(`/api/v1/accruals/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
 
   remove: (id: string) => http<void>(`/api/v1/accruals/${id}`, { method: 'DELETE' }),
+
+  /** Submit a scanned QR string → creates an accrual + queues the receipt fetch. */
+  scanQr: (qrRaw: string) =>
+    http<ScanQrResult>('/api/v1/accruals/scan-qr', {
+      method: 'POST',
+      body: JSON.stringify({ qrRaw }),
+    }),
+
+  /** Poll the async receipt-fetch progress for an accrual. */
+  getReceiptStatus: (accrualId: string) =>
+    http<ReceiptStatus>(`/api/v1/accruals/${accrualId}/receipt-status`),
 
   getReceipt: (accrualId: string) =>
     http<Receipt>(`/api/v1/accruals/${accrualId}/receipt`),

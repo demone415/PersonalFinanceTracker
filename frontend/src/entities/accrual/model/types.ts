@@ -93,3 +93,25 @@ export interface Receipt {
   fetchAttempts: number
   items: ReceiptItem[]
 }
+
+/** Async receipt-fetch lifecycle (mirrors backend ReceiptFetchStatus enum). */
+export type ReceiptFetchStatus = 'Pending' | 'Fetched' | 'Failed' | 'RetryLimit'
+
+/** Result of POST /api/v1/accruals/scan-qr — the created accrual + queued receipt. */
+export interface ScanQrResult {
+  accrualId: string
+  receiptId: string
+  fetchStatus: ReceiptFetchStatus
+}
+
+/**
+ * Progress of the background receipt fetch (GET /accruals/{id}/receipt-status).
+ * While `Pending`, `queuePosition` is the 1-based slot in the global FIFO queue.
+ */
+export interface ReceiptStatus {
+  accrualId: string
+  receiptId?: string
+  fetchStatus: ReceiptFetchStatus
+  fetchAttempts: number
+  queuePosition?: number
+}

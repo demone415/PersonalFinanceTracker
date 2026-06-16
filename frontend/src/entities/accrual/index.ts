@@ -8,6 +8,9 @@ export type {
   Receipt,
   ReceiptItem,
   ReceiptItemInput,
+  ReceiptFetchStatus,
+  ReceiptStatus,
+  ScanQrResult,
 } from './model/types'
 
 export {
@@ -20,4 +23,6 @@ export {
   useAddReceiptItem,
   useUpdateReceiptItem,
   useDeleteReceiptItem,
+  useScanQr,
+  useReceiptStatus,
 } from './api/accrual-queries'
