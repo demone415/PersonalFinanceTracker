@@ -48,7 +48,12 @@ public static class ReceiptProviderServiceCollectionExtensions
             .ConfigureHttpClient(client =>
             {
                 client.BaseAddress = new Uri(providerOptions.BaseUrl);
-                client.Timeout = TimeSpan.FromSeconds(providerOptions.RequestTimeoutSeconds + 5);
+
+                // Let the resilience pipeline own all timeouts. HttpClient.Timeout
+                // spans the whole send (every retry), so a finite value here would
+                // abort the pipeline mid-retry; the per-attempt AddTimeout below is
+                // the correct boundary.
+                client.Timeout = Timeout.InfiniteTimeSpan;
             })
             .AddResilienceHandler("proverka-checka", (builder, context) =>
             {
