@@ -810,9 +810,9 @@ jobs:
 - [x] T4.2.4 Обновление `Receipt.FetchStatus` после успеха/ошибки/лимита; перевод в `RetryLimit` → DLQ
 
 **Story 4.3: Сканер на фронтенде**
-- [ ] T4.3.1 QrScanner компонент (камера через @zxing/browser + загрузка файла)
-- [ ] T4.3.2 Поток: скан QR → POST /accruals/scan-qr → создание начисления
-- [ ] T4.3.3 Индикатор статуса подгрузки чека (`GET /accruals/{id}/receipt-status`): Queued (позиция) / Получен / Ошибка / Лимит попыток
+- [x] T4.3.1 QrScanner компонент (камера через @zxing/browser + загрузка файла)
+- [x] T4.3.2 Поток: скан QR → POST /accruals/scan-qr → создание начисления
+- [x] T4.3.3 Индикатор статуса подгрузки чека (`GET /accruals/{id}/receipt-status`): Queued (позиция) / Получен / Ошибка / Лимит попыток
 
 ---
 
