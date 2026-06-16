@@ -1,5 +1,6 @@
-import { CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { useReceiptStatus, type ReceiptFetchStatus } from '@/entities/accrual'
+import { Skeleton } from '@/shared/ui/skeleton'
 
 /**
  * Live indicator of the background receipt fetch (T4.3.3). Polls
@@ -10,12 +11,15 @@ export function ReceiptStatusIndicator({ accrualId }: { accrualId: string }) {
   const { data, isPending, isError } = useReceiptStatus(accrualId)
 
   if (isPending) {
+    // Skeleton placeholder while the first status load is in flight (no raw spinners).
     return (
-      <StatusRow
-        icon={<Loader2 className="size-5 animate-spin text-muted-foreground" />}
-        title="Запрашиваем статус…"
-        tone="muted"
-      />
+      <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
+        <Skeleton className="size-5 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-56" />
+        </div>
+      </div>
     )
   }
 

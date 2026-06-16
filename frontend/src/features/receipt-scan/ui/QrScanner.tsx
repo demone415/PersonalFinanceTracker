@@ -21,6 +21,7 @@ export function QrScanner({
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const mountedRef = useRef(true)
 
   const [cameraOn, setCameraOn] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -33,7 +34,13 @@ export function QrScanner({
   }, [])
 
   // Always release the camera when the component unmounts.
-  useEffect(() => stopCamera, [stopCamera])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      stopCamera()
+    }
+  }, [stopCamera])
 
   async function startCamera() {
     setError(null)
@@ -41,7 +48,10 @@ export function QrScanner({
     try {
       const reader = new BrowserQRCodeReader()
       setCameraOn(true)
-      controlsRef.current = await reader.decodeFromConstraints(
+      // `decodeFromConstraints` starts the camera stream *before* it resolves, so
+      // an unmount during this await would otherwise leave the controls in a dead
+      // ref and the camera live. Stop immediately if we're no longer mounted.
+      const controls = await reader.decodeFromConstraints(
         { video: { facingMode: 'environment' } },
         videoRef.current!,
         (result) => {
@@ -50,6 +60,11 @@ export function QrScanner({
           onDecode(result.getText())
         },
       )
+      if (!mountedRef.current) {
+        controls.stop()
+        return
+      }
+      controlsRef.current = controls
     } catch (err) {
       setCameraOn(false)
       setError(
