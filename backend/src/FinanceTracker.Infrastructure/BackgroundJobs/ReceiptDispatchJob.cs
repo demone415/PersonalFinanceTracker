@@ -52,11 +52,24 @@ public sealed class ReceiptDispatchJob(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var result = await processor.ProcessAsync(item.ReceiptId, cancellationToken);
+            ReceiptFetchProcessingResult result;
+            try
+            {
+                result = await processor.ProcessAsync(item.ReceiptId, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Isolate per-receipt failures: one bad receipt must not abort the
+                // whole sweep. It stays Pending and is retried on the next pass.
+                logger.LogError(ex, "Dispatch of receipt {ReceiptId} failed; continuing.", item.ReceiptId);
+                continue;
+            }
+
             if (result.Status == ReceiptFetchProcessingStatus.Paused)
             {
-                // Rate-limiter down → fail-closed: stop the whole sweep (ARCHITECTURE.md §4).
-                logger.LogWarning("Rate-limiter unavailable; pausing the dispatch sweep.");
+                // Limiter down or feature disabled → fail-closed: stop the whole
+                // sweep so we don't hammer a known-unavailable dependency (§4).
+                logger.LogWarning("Receipt processing paused; stopping the dispatch sweep.");
                 break;
             }
         }

@@ -33,6 +33,7 @@ public class ReceiptFetchProcessorTests
         public Mock<IReceiptProvider> Provider { get; } = new(MockBehavior.Strict);
         public Mock<IReceiptRateLimiter> RateLimiter { get; } = new(MockBehavior.Strict);
         public Mock<IReceiptDeadLetterQueue> DeadLetters { get; } = new();
+        public Mock<IReceiptFeatureGate> FeatureGate { get; } = new();
         public ReceiptFetchProcessor Processor { get; }
 
         public Harness(string dbName)
@@ -42,12 +43,15 @@ public class ReceiptFetchProcessorTests
                 .Options;
             Db = new AppDbContext(options, new StubCurrentUser(null, IsAdmin: true));
 
+            FeatureGate.Setup(g => g.IsScanningEnabled).Returns(true); // enabled by default
+
             Processor = new ReceiptFetchProcessor(
                 Db,
                 new UnitOfWork(Db),
                 Provider.Object,
                 RateLimiter.Object,
                 DeadLetters.Object,
+                FeatureGate.Object,
                 new FixedTimeProvider(Now),
                 NullLogger<ReceiptFetchProcessor>.Instance);
         }
@@ -243,6 +247,23 @@ public class ReceiptFetchProcessorTests
         Assert.Equal(ReceiptFetchProcessingStatus.Skipped, result.Status);
         h.Provider.Verify(p => p.GetReceiptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         h.RateLimiter.Verify(r => r.TryAcquireAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ScanningDisabled_Pauses_WithoutCallingProviderOrLimiter()
+    {
+        var h = new Harness(nameof(ScanningDisabled_Pauses_WithoutCallingProviderOrLimiter));
+        var receipt = h.SeedPending();
+        h.FeatureGate.Setup(g => g.IsScanningEnabled).Returns(false);
+
+        var result = await h.Processor.ProcessAsync(receipt.Id);
+
+        Assert.Equal(ReceiptFetchProcessingStatus.Paused, result.Status);
+        var saved = h.Reload(receipt.Id);
+        Assert.Equal(ReceiptFetchStatus.Pending, saved.FetchStatus);
+        Assert.Equal(0, saved.FetchAttempts);
+        h.RateLimiter.Verify(r => r.TryAcquireAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Provider.Verify(p => p.GetReceiptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

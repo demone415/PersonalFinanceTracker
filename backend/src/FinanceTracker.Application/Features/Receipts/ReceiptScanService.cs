@@ -18,12 +18,23 @@ public sealed class ReceiptScanService(
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
     IMessagePublisher publisher,
+    IReceiptFeatureGate featureGate,
     ILogger<ReceiptScanService> logger)
 {
+    /// <summary>Stable error code returned when scanning is off (no provider token).</summary>
+    public const string ScanningDisabledCode = "receipt_scanning_disabled";
+
     public async Task<ScanQrResponse> ScanAsync(ScanQrRequest request, CancellationToken cancellationToken = default)
     {
         var userId = currentUser.UserId
             ?? throw new ForbiddenAccessException("Authentication required.");
+
+        if (!featureGate.IsScanningEnabled)
+        {
+            throw new FeatureDisabledException(
+                ScanningDisabledCode,
+                "Receipt scanning is disabled: the ProverkaCheka provider token is not configured.");
+        }
 
         // Validated by ScanQrRequestValidator before we get here; re-parse to build
         // the entities (and guard defensively).

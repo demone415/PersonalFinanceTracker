@@ -49,6 +49,7 @@ public sealed class ReceiptFetchProcessor(
     IReceiptProvider provider,
     IReceiptRateLimiter rateLimiter,
     IReceiptDeadLetterQueue deadLetters,
+    IReceiptFeatureGate featureGate,
     TimeProvider timeProvider,
     ILogger<ReceiptFetchProcessor> logger)
 {
@@ -84,6 +85,16 @@ public sealed class ReceiptFetchProcessor(
         {
             logger.LogWarning("Receipt {ReceiptId} has no QR payload; cannot fetch.", receiptId);
             return await DeadLetterAsync(receipt, "receipt has no QR payload", cancellationToken);
+        }
+
+        // Feature switched off (no provider token). Pause rather than burn the retry
+        // budget on a permanent config gap: the receipt waits, untouched, until a
+        // token is configured (it is not a transient or terminal failure).
+        if (!featureGate.IsScanningEnabled)
+        {
+            logger.LogWarning(
+                "Receipt scanning disabled (no provider token); pausing receipt {ReceiptId}.", receiptId);
+            return new(ReceiptFetchProcessingStatus.Paused);
         }
 
         // Daily-quota guard. Fail-closed: an unreachable limiter pauses the queue

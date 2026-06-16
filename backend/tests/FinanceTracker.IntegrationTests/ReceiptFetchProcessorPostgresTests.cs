@@ -102,7 +102,9 @@ public sealed class ReceiptFetchProcessorPostgresTests : IAsyncLifetime
 
             var processor = new ReceiptFetchProcessor(
                 run, new UnitOfWork(run), provider.Object, limiter.Object,
-                Mock.Of<IReceiptDeadLetterQueue>(), new FixedTimeProvider(Now),
+                Mock.Of<IReceiptDeadLetterQueue>(),
+                Mock.Of<IReceiptFeatureGate>(g => g.IsScanningEnabled == true),
+                new FixedTimeProvider(Now),
                 NullLogger<ReceiptFetchProcessor>.Instance);
 
             var result = await processor.ProcessAsync(receiptId);
