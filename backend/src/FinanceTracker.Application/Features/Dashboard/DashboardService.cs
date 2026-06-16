@@ -90,15 +90,17 @@ public sealed class DashboardService(
         var from = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero);
         var to = from.AddMonths(1);
 
+        // Each row is converted to the base currency via its captured rate
+        // (Epic 8 — mirrors Accrual.AmountInBaseCurrency): a null rate is 1:1.
         var month_ = await db.Accruals
             .Where(a => a.IncludeInStats && a.Date >= from && a.Date < to)
             .GroupBy(_ => 1)
             .Select(g => new
             {
-                Income = g.Sum(x => x.Type == AccrualType.Income ? x.Amount
-                    : x.Type == AccrualType.ReturnIncome ? -x.Amount : 0m),
-                Expense = g.Sum(x => x.Type == AccrualType.Expense ? x.Amount
-                    : x.Type == AccrualType.ReturnExpense ? -x.Amount : 0m),
+                Income = g.Sum(x => (x.Type == AccrualType.Income ? x.Amount
+                    : x.Type == AccrualType.ReturnIncome ? -x.Amount : 0m) * (x.ExchangeRate ?? 1m)),
+                Expense = g.Sum(x => (x.Type == AccrualType.Expense ? x.Amount
+                    : x.Type == AccrualType.ReturnExpense ? -x.Amount : 0m) * (x.ExchangeRate ?? 1m)),
             })
             .FirstOrDefaultAsync(ct);
 
@@ -107,10 +109,10 @@ public sealed class DashboardService(
             .GroupBy(_ => 1)
             .Select(g => new
             {
-                Income = g.Sum(x => x.Type == AccrualType.Income ? x.Amount
-                    : x.Type == AccrualType.ReturnIncome ? -x.Amount : 0m),
-                Expense = g.Sum(x => x.Type == AccrualType.Expense ? x.Amount
-                    : x.Type == AccrualType.ReturnExpense ? -x.Amount : 0m),
+                Income = g.Sum(x => (x.Type == AccrualType.Income ? x.Amount
+                    : x.Type == AccrualType.ReturnIncome ? -x.Amount : 0m) * (x.ExchangeRate ?? 1m)),
+                Expense = g.Sum(x => (x.Type == AccrualType.Expense ? x.Amount
+                    : x.Type == AccrualType.ReturnExpense ? -x.Amount : 0m) * (x.ExchangeRate ?? 1m)),
             })
             .FirstOrDefaultAsync(ct);
 
@@ -135,7 +137,8 @@ public sealed class DashboardService(
             .Select(g => new
             {
                 CategoryId = g.Key,
-                Amount = g.Sum(x => x.Type == AccrualType.ReturnExpense ? -x.Amount : x.Amount),
+                // Converted to base currency (Epic 8); null rate is 1:1.
+                Amount = g.Sum(x => (x.Type == AccrualType.ReturnExpense ? -x.Amount : x.Amount) * (x.ExchangeRate ?? 1m)),
             })
             .ToListAsync(ct);
 
@@ -182,10 +185,11 @@ public sealed class DashboardService(
             {
                 g.Key.Year,
                 g.Key.Month,
-                Income = g.Sum(x => x.Type == AccrualType.Income ? x.Amount
-                    : x.Type == AccrualType.ReturnIncome ? -x.Amount : 0m),
-                Expense = g.Sum(x => x.Type == AccrualType.Expense ? x.Amount
-                    : x.Type == AccrualType.ReturnExpense ? -x.Amount : 0m),
+                // Converted to base currency (Epic 8); null rate is 1:1.
+                Income = g.Sum(x => (x.Type == AccrualType.Income ? x.Amount
+                    : x.Type == AccrualType.ReturnIncome ? -x.Amount : 0m) * (x.ExchangeRate ?? 1m)),
+                Expense = g.Sum(x => (x.Type == AccrualType.Expense ? x.Amount
+                    : x.Type == AccrualType.ReturnExpense ? -x.Amount : 0m) * (x.ExchangeRate ?? 1m)),
             })
             .ToListAsync(ct);
 

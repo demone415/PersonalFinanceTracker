@@ -2,7 +2,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend,
 } from 'recharts'
 import { useMonthlyDynamics } from '@/entities/dashboard'
-import { formatRub, formatRubCompact, formatMonthShort, formatMonthLong } from '@/shared/lib/format'
+import { useBaseCurrency } from '@/entities/profile'
+import { formatMoney, formatMoneyCompact, formatMonthShort, formatMonthLong } from '@/shared/lib/format'
 import { ChartCard } from './ChartCard'
 
 const INCOME = 'oklch(0.7 0.15 150)'
@@ -11,6 +12,7 @@ const EXPENSE = 'oklch(0.65 0.2 25)'
 /** Income vs. expense over the last N months (T2.2.3). */
 export function MonthlyDynamicsChart({ months = 6 }: { months?: number }) {
   const { data, isPending, isError } = useMonthlyDynamics(months)
+  const base = useBaseCurrency()
   const points = (data ?? []).map((p) => ({
     ...p,
     label: formatMonthShort(p.year, p.month),
@@ -39,9 +41,9 @@ export function MonthlyDynamicsChart({ months = 6 }: { months?: number }) {
               tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => formatRubCompact(v)}
+              tickFormatter={(v: number) => formatMoneyCompact(v, base)}
             />
-            <Tooltip content={<DynamicsTooltip />} />
+            <Tooltip content={<DynamicsTooltip currency={base} />} />
             <Legend
               iconType="plainline"
               wrapperStyle={{ fontSize: 12 }}
@@ -76,14 +78,16 @@ interface DynamicsPayload {
   payload: { year: number; month: number; income: number; expense: number }
 }
 
-function DynamicsTooltip({ active, payload }: { active?: boolean; payload?: DynamicsPayload[] }) {
+function DynamicsTooltip({
+  active, payload, currency = 'RUB',
+}: { active?: boolean; payload?: DynamicsPayload[]; currency?: string }) {
   if (!active || !payload?.length) return null
   const { year, month, income, expense } = payload[0].payload
   return (
     <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
       <p className="mb-1 font-medium">{formatMonthLong(year, month)}</p>
-      <p className="tabular-nums text-green-500">Доходы: {formatRub(income)}</p>
-      <p className="tabular-nums text-red-500">Расходы: {formatRub(expense)}</p>
+      <p className="tabular-nums text-green-500">Доходы: {formatMoney(income, currency)}</p>
+      <p className="tabular-nums text-red-500">Расходы: {formatMoney(expense, currency)}</p>
     </div>
   )
 }

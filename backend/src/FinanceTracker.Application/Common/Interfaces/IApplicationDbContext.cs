@@ -11,6 +11,7 @@ namespace FinanceTracker.Application.Common.Interfaces;
 /// </summary>
 public interface IApplicationDbContext
 {
+    DbSet<UserProfile> UserProfiles { get; }
     DbSet<Category> Categories { get; }
     DbSet<MonthlyBudget> MonthlyBudgets { get; }
     DbSet<Accrual> Accruals { get; }

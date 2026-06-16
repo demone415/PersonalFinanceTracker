@@ -5,10 +5,13 @@ import {
   type AccrualListItem,
   type AccrualType,
 } from '@/entities/accrual'
+import { useDashboardSummary } from '@/entities/dashboard'
+import { useBaseCurrency } from '@/entities/profile'
 import { useSessionStore } from '@/entities/session'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/skeleton'
 import { LucideIcon } from '@/shared/ui/lucide-icon'
+import { formatMoney } from '@/shared/lib/format'
 
 const TYPE_LABELS: Record<AccrualType, string> = {
   Income: 'Доход',
@@ -19,10 +22,6 @@ const TYPE_LABELS: Record<AccrualType, string> = {
 
 function isInflow(type: AccrualType) {
   return type === 'Income' || type === 'ReturnExpense'
-}
-
-function formatRub(value: number) {
-  return `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 }
 
 function greeting() {
@@ -39,42 +38,17 @@ function displayName(email: string | null | undefined) {
   return local.charAt(0).toUpperCase() + local.slice(1)
 }
 
-function monthRange() {
-  const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-  return { from: from.toISOString(), to: to.toISOString() }
-}
-
-interface MonthStats {
-  income: number
-  expense: number
-  balance: number
-}
-
-function computeStats(items: AccrualListItem[]): MonthStats {
-  let income = 0
-  let expense = 0
-  for (const a of items) {
-    if (!a.includeInStats) continue
-    switch (a.type) {
-      case 'Income': income += a.amount; break
-      case 'ReturnIncome': income -= a.amount; break
-      case 'Expense': expense += a.amount; break
-      case 'ReturnExpense': expense -= a.amount; break
-    }
-  }
-  return { income, expense, balance: income - expense }
-}
-
 export function HomePage() {
   const email = useSessionStore((s) => s.session?.user?.email)
-  const { from, to } = monthRange()
+  const base = useBaseCurrency()
 
-  const monthQuery = useAccruals({ dateFrom: from, dateTo: to, pageSize: 500 })
+  // Month figures come from the backend summary, which converts every accrual to
+  // the base currency (Epic 8) — a client-side sum of the list would mix
+  // currencies, since the list carries no exchange rate.
+  const summaryQuery = useDashboardSummary()
   const recentQuery = useAccruals({ pageSize: 5 })
 
-  const stats = monthQuery.data ? computeStats(monthQuery.data.items) : null
+  const summary = summaryQuery.data
   const name = displayName(email)
 
   return (
@@ -103,19 +77,19 @@ export function HomePage() {
       <section className="grid grid-cols-3 gap-3">
         <StatCard
           label="Баланс за месяц"
-          value={stats ? formatRub(stats.balance) : undefined}
-          loading={monthQuery.isPending}
-          accent={stats && stats.balance >= 0 ? 'text-green-500' : 'text-red-500'}
+          value={summary ? formatMoney(summary.monthBalance, base) : undefined}
+          loading={summaryQuery.isPending}
+          accent={summary && summary.monthBalance >= 0 ? 'text-green-500' : 'text-red-500'}
         />
         <StatCard
           label="Доходы"
-          value={stats ? formatRub(stats.income) : undefined}
-          loading={monthQuery.isPending}
+          value={summary ? formatMoney(summary.monthIncome, base) : undefined}
+          loading={summaryQuery.isPending}
         />
         <StatCard
           label="Расходы"
-          value={stats ? formatRub(stats.expense) : undefined}
-          loading={monthQuery.isPending}
+          value={summary ? formatMoney(summary.monthExpense, base) : undefined}
+          loading={summaryQuery.isPending}
           accent="text-red-500"
         />
       </section>
@@ -204,7 +178,7 @@ function RecentRow({ item }: { item: AccrualListItem }) {
           </p>
         </div>
         <span className={`shrink-0 text-sm font-semibold tabular-nums ${color}`}>
-          {sign}{formatRub(item.amount)}
+          {sign}{formatMoney(item.amount, item.currency)}
         </span>
       </Link>
     </li>

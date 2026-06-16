@@ -10,19 +10,42 @@ const MONTHS_LONG = [
   'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',
 ]
 
-/** Whole-ruble amount, e.g. `1 234 ₽`. */
-export function formatRub(value: number): string {
-  return `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
+/**
+ * Currency-aware whole-unit amount in the user's base currency (Epic 8), e.g.
+ * `1 234 ₽` or `1 234 $`. Falls back to the ISO code for currencies `Intl` has
+ * no symbol for. Used by aggregate views once amounts are converted to base.
+ */
+export function formatMoney(value: number, currency = 'RUB'): string {
+  try {
+    return new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+      currencyDisplay: 'narrowSymbol',
+    }).format(value)
+  } catch {
+    // Invalid/unknown ISO code — degrade gracefully to "<amount> <code>".
+    return `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ${currency}`
+  }
 }
 
-/** Compact ruble amount for chart axes/labels, e.g. `12,3 тыс ₽`. */
-export function formatRubCompact(value: number): string {
-  const abs = Math.abs(value)
-  if (abs >= 1_000_000)
-    return `${(value / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} млн ₽`
-  if (abs >= 10_000)
-    return `${Math.round(value / 1_000).toLocaleString('ru-RU')} тыс ₽`
-  return formatRub(value)
+/**
+ * Currency-aware compact amount for chart axes/labels in the base currency
+ * (Epic 8), e.g. `12 тыс. ₽` or `12K $`. Falls back to the ISO code for unknown
+ * currencies.
+ */
+export function formatMoneyCompact(value: number, currency = 'RUB'): string {
+  try {
+    return new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency,
+      notation: 'compact',
+      maximumFractionDigits: 1,
+      currencyDisplay: 'narrowSymbol',
+    }).format(value)
+  } catch {
+    return `${value.toLocaleString('ru-RU', { notation: 'compact', maximumFractionDigits: 1 })} ${currency}`
+  }
 }
 
 /** Short month label, e.g. `июн` (or `июн 25` when crossing a year boundary). */

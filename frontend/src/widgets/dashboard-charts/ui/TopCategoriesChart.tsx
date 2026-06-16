@@ -2,7 +2,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer, Tooltip,
 } from 'recharts'
 import { useTopCategories, type PeriodParams } from '@/entities/dashboard'
-import { formatRub, formatRubCompact } from '@/shared/lib/format'
+import { useBaseCurrency } from '@/entities/profile'
+import { formatMoney, formatMoneyCompact } from '@/shared/lib/format'
 import { ChartCard } from './ChartCard'
 
 /** Top expense categories for the month as a horizontal bar chart (T2.2.4). */
@@ -14,6 +15,7 @@ export function TopCategoriesChart({
   period?: PeriodParams
 }) {
   const { data, isPending, isError } = useTopCategories(limit, period)
+  const base = useBaseCurrency()
   const items = data ?? []
 
   return (
@@ -36,7 +38,7 @@ export function TopCategoriesChart({
               tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => formatRubCompact(v)}
+              tickFormatter={(v: number) => formatMoneyCompact(v, base)}
             />
             <YAxis
               type="category"
@@ -46,7 +48,7 @@ export function TopCategoriesChart({
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip cursor={{ fill: 'var(--color-accent)' }} content={<TopTooltip />} />
+            <Tooltip cursor={{ fill: 'var(--color-accent)' }} content={<TopTooltip currency={base} />} />
             <Bar dataKey="amount" radius={[0, 6, 6, 0]} barSize={22}>
               {items.map((item) => (
                 <Cell key={item.categoryId ?? 'none'} fill={item.color} />
@@ -63,13 +65,15 @@ interface TopPayload {
   payload: { categoryName: string; amount: number }
 }
 
-function TopTooltip({ active, payload }: { active?: boolean; payload?: TopPayload[] }) {
+function TopTooltip({
+  active, payload, currency = 'RUB',
+}: { active?: boolean; payload?: TopPayload[]; currency?: string }) {
   if (!active || !payload?.length) return null
   const { categoryName, amount } = payload[0].payload
   return (
     <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
       <p className="font-medium">{categoryName}</p>
-      <p className="tabular-nums text-muted-foreground">{formatRub(amount)}</p>
+      <p className="tabular-nums text-muted-foreground">{formatMoney(amount, currency)}</p>
     </div>
   )
 }
