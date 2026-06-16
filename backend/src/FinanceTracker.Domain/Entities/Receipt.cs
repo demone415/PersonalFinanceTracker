@@ -78,6 +78,50 @@ public class Receipt : IUserOwnedEntity
         RawMetadata = rawMetadata;
     }
 
+    /// <summary>
+    /// Applies the fiscal details fetched from the provider, replaces the item
+    /// list, and marks the receipt as fetched. The QR-derived <see cref="Date"/>
+    /// is authoritative and left untouched; the provider total overrides the
+    /// QR amount only when it is present (&gt; 0).
+    /// </summary>
+    public void ApplyFetchedData(
+        string? organization,
+        string? address,
+        string? inn,
+        string? cashier,
+        int? shiftNumber,
+        string? externalNumber,
+        long totalSumInKopecks,
+        TaxationType? taxationType,
+        long? fd,
+        string? fn,
+        string? fpd,
+        IEnumerable<ReceiptItem> items,
+        string? rawMetadata)
+    {
+        Organization = organization;
+        Address = address;
+        INN = inn;
+        Cashier = cashier;
+        ShiftNumber = shiftNumber;
+        ExternalNumber = externalNumber;
+        if (totalSumInKopecks > 0)
+        {
+            AmountInKopecks = totalSumInKopecks;
+        }
+
+        TaxationType = taxationType;
+        FD = fd ?? FD;
+        FN = fn ?? FN;
+        FPD = fpd ?? FPD;
+
+        _items.Clear();
+        _items.AddRange(items);
+
+        FetchStatus = ReceiptFetchStatus.Fetched;
+        RawMetadata = rawMetadata;
+    }
+
     public void MarkFailed()
     {
         FetchStatus = FetchAttempts >= 5 ? ReceiptFetchStatus.RetryLimit : ReceiptFetchStatus.Failed;
