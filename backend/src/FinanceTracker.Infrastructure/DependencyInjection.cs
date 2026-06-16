@@ -1,6 +1,7 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using FinanceTracker.Application.Common.Interfaces;
+using FinanceTracker.Infrastructure.BackgroundJobs;
 using FinanceTracker.Infrastructure.Caching;
 using FinanceTracker.Infrastructure.ExternalProviders.ProverkaChecka;
 using FinanceTracker.Infrastructure.Identity;
@@ -59,6 +60,11 @@ public static class DependencyInjection
         // External receipt provider (Story 4.1): Refit client + Polly resilience,
         // and the Redis-backed daily-quota rate limiter (fail-closed).
         services.AddReceiptProvider(configuration);
+
+        // Background receipt processing (Story 4.2): Hangfire FIFO queue + jobs and
+        // the Wolverine-backed scheduler/DLQ/publisher. The Wolverine bus itself is
+        // configured on the host (Program.cs → WolverineConfiguration).
+        services.AddBackgroundProcessing(configuration);
 
         AddHealthChecks(services, configuration, connectionString);
 

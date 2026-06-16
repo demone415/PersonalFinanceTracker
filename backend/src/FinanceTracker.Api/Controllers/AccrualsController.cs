@@ -1,6 +1,9 @@
+using FinanceTracker.Api.RateLimiting;
 using FinanceTracker.Application.Features.Accruals;
+using FinanceTracker.Application.Features.Receipts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FinanceTracker.Api.Controllers;
 
@@ -51,6 +54,32 @@ public sealed class AccrualsController : ControllerBase
         await service.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
+
+    // ── QR scan → background receipt fetch (Story 4.2 / T4.3.2) ───────────────
+
+    /// <summary>
+    /// Accepts a scanned receipt QR: creates the accrual + a Pending receipt and
+    /// queues the fetch. Rate-limited tighter than the API default because each
+    /// scan ultimately consumes the shared ≤15/day provider quota.
+    /// </summary>
+    [HttpPost("scan-qr")]
+    [EnableRateLimiting(RateLimitingExtensions.ScanQrPolicy)]
+    public async Task<ActionResult<ScanQrResponse>> ScanQr(
+        [FromBody] ScanQrRequest request,
+        [FromServices] ReceiptScanService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ScanAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = result.AccrualId }, result);
+    }
+
+    /// <summary>Polls the async fetch progress for an accrual's receipt (T4.3.3).</summary>
+    [HttpGet("{id:guid}/receipt-status")]
+    public Task<ReceiptStatusResponse> GetReceiptStatus(
+        Guid id,
+        [FromServices] ReceiptScanService service,
+        CancellationToken cancellationToken) =>
+        service.GetStatusAsync(id, cancellationToken);
 
     // ── Receipt items (T1.4.7) ───────────────────────────────────────────────
 

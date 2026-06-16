@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/shared/api/supabase'
 import { useSessionStore } from '@/entities/session'
+import { useCapabilities } from '@/entities/capabilities'
 import { cn } from '@/shared/lib/utils'
 import { ThemeToggle } from '@/shared/ui/theme-toggle'
 import { Button } from '@/shared/ui/button'
@@ -43,6 +44,11 @@ export function AppShell() {
   const isAdmin = useSessionStore((s) => s.isAdmin)
   const email = useSessionStore((s) => s.session?.user?.email)
   const [moreOpen, setMoreOpen] = useState(false)
+
+  // Receipt scanning is off when the backend has no provider token. Stay optimistic
+  // while the flag loads (undefined) and only disable once it's explicitly false.
+  const { data: capabilities } = useCapabilities()
+  const scanEnabled = capabilities?.receiptScanning !== false
 
   const name = displayName(email)
   const initials = name.slice(0, 2).toUpperCase()
@@ -119,13 +125,25 @@ export function AppShell() {
         <TabLink item={MOBILE_TABS[0]} />
         <TabLink item={MOBILE_TABS[1]} />
 
-        <Link
-          to="/scan"
-          aria-label="Сканировать QR"
-          className="-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95"
-        >
-          <QrCode className="size-6" />
-        </Link>
+        {scanEnabled ? (
+          <Link
+            to="/scan"
+            aria-label="Сканировать QR"
+            className="-mt-6 flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95"
+          >
+            <QrCode className="size-6" />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-label="Сканирование чеков недоступно"
+            title="Загрузка чеков недоступна: не настроен токен провайдера"
+            className="-mt-6 flex size-14 shrink-0 cursor-not-allowed items-center justify-center rounded-full bg-muted text-muted-foreground shadow-lg ring-4 ring-background"
+          >
+            <QrCode className="size-6" />
+          </button>
+        )}
 
         <TabLink item={MOBILE_TABS[2]} />
         <button

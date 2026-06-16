@@ -20,6 +20,7 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
             ForbiddenAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
+            FeatureDisabledException => (StatusCodes.Status503ServiceUnavailable, "Feature Disabled"),
             _ => (0, string.Empty),
         };
 
@@ -30,15 +31,24 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
 
         httpContext.Response.StatusCode = status;
 
+        var problemDetails = new ProblemDetails
+        {
+            Status = status,
+            Title = title,
+            Detail = exception.Message,
+        };
+
+        // Expose a machine-readable code so the SPA can disable the related
+        // controls (rather than just showing a generic error).
+        if (exception is FeatureDisabledException disabled)
+        {
+            problemDetails.Extensions["code"] = disabled.Code;
+        }
+
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = title,
-                Detail = exception.Message,
-            },
+            ProblemDetails = problemDetails,
         });
     }
 }

@@ -4,10 +4,12 @@ using FinanceTracker.Api.Observability;
 using FinanceTracker.Api.RateLimiting;
 using FinanceTracker.Application;
 using FinanceTracker.Infrastructure;
+using FinanceTracker.Infrastructure.Messaging;
 using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 using Serilog;
+using Wolverine;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,8 +20,13 @@ builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfigurati
     .ReadFrom.Services(services));
 
 // Infrastructure layer: EF Core / AppDbContext / Unit of Work, object storage,
-// readiness probes (and later messaging, caching, background jobs, providers).
+// caching, background jobs (Hangfire), readiness probes and external providers.
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Message bus (Story 4.2): Wolverine over RabbitMQ — the receipt-fetch consumer,
+// explicit routing and the dead-letter policy (see WolverineConfiguration).
+builder.Host.UseWolverine(options =>
+    WolverineConfiguration.Configure(options, builder.Configuration));
 
 // Application layer: feature services + FluentValidation validators.
 builder.Services.AddApplication();

@@ -346,7 +346,7 @@ public async Task<IActionResult> Create(
 | Unit of Work        | `IUnitOfWork` → `UnitOfWork(AppDbContext)`, scope per request |
 | Repository          | Через `DbSet<T>` внутри DbContext, без отдельного репо-класса |
 | Rich Domain Model   | Бизнес-методы в entity, не в сервисах                        |
-| Outbox/Inbox        | Wolverine + EF Core для гарантированной доставки сообщений   |
+| Outbox/Inbox        | См. примечание ниже — на M3 сообщения публикуются после коммита, durable Postgres-outbox отложен |
 | Idempotency         | `Idempotency-Key` header → хранится в БД, дедупликация       |
 | Optimistic Locking  | `RowVersion` на Accrual, Budget                              |
 | Идентификаторы (PK) | **GUID v7** (`Guid.CreateVersion7()`, .NET 9+), генерация app-side — упорядоченность для локальности B-tree индекса |
@@ -804,10 +804,10 @@ jobs:
 - [x] T4.1.6 Добавить `Receipt.UserId` + per-user дневной cap на запросы к провайдеру
 
 **Story 4.2: Фоновая обработка чеков**
-- [ ] T4.2.1 Wolverine message `ReceiptFetchRequested` + consumer handler; DLQ для терминальных ошибок
-- [ ] T4.2.2 Глобальная FIFO-очередь `receipts` (`WorkerCount = 1`, последовательная обработка) + round-robin между юзерами
-- [ ] T4.2.3 Hangfire job `ReceiptFetchJob` с Schedule (схема 2: +6ч, +1д, +3д, +10д); идемпотентность по `FetchStatus`
-- [ ] T4.2.4 Обновление `Receipt.FetchStatus` после успеха/ошибки/лимита; перевод в `RetryLimit` → DLQ
+- [x] T4.2.1 Wolverine message `ReceiptFetchRequested` + consumer handler; DLQ для терминальных ошибок
+- [x] T4.2.2 Глобальная FIFO-очередь `receipts` (`WorkerCount = 1`, последовательная обработка) + round-robin между юзерами
+- [x] T4.2.3 Hangfire job `ReceiptFetchJob` с Schedule (схема 2: +6ч, +1д, +3д, +10д); идемпотентность по `FetchStatus`
+- [x] T4.2.4 Обновление `Receipt.FetchStatus` после успеха/ошибки/лимита; перевод в `RetryLimit` → DLQ
 
 **Story 4.3: Сканер на фронтенде**
 - [ ] T4.3.1 QrScanner компонент (камера через @zxing/browser + загрузка файла)
@@ -891,7 +891,7 @@ jobs:
 |---------|-------------|
 | Supabase GoTrue для Auth | Полноценный auth-сервис с управлением сессиями; .NET только валидирует JWT по shared secret — нет lock-in на ASP.NET Identity |
 | Clean Architecture + Feature Slices (без CQRS) | Слои — тестируемость; Feature Slices — минимальный coupling; сервисы проще, чем Command/Query объекты |
-| Wolverine (не MassTransit) | Нативная интеграция с EF Core для Outbox, простая настройка дюрабельности |
+| Wolverine (не MassTransit) | Нативная интеграция с EF Core для Outbox (план), простая настройка дюрабельности и DLQ; на M3 outbox отложен — см. примечание ниже |
 | FusionCache + Redis | In-memory + Redis backplane = кэш выживает при рестарте |
 | Ручной маппинг (не AutoMapper) | Явная типобезопасность, проще отлаживать, нет reflection оверхеда |
 | TanStack Query + Zustand | TQ — серверное состояние (кэш, инвалидация); Zustand — клиентское UI состояние |
@@ -900,10 +900,12 @@ jobs:
 | GUID v7 для всех PK | Упорядоченность по времени → локальность B-tree индекса (быстрее v4); id не секрет — защита ресурсов через authz + rate-limit + случайный object key |
 | Idempotency Key | Защита от дублирования транзакций при retry на клиенте |
 | Supabase PostgreSQL для Hangfire + Wolverine | Единая БД, нет дополнительных зависимостей |
-| Глобальная FIFO-очередь + round-robin (1 воркер) | Не превышаем лимит провайдера, не зовём API параллельно, честное распределение между юзерами |
+| **Durable Postgres-outbox отложен (M3)** | `WolverineFx.Postgresql`/`.EntityFrameworkCore` тянут `Weasel.Postgresql` → `Npgsql 9`, что конфликтует с `Npgsql 10` (EF Core 10). Транзакционный outbox к тому же требует, чтобы публикация участвовала в EF-транзакции продьюсера (`IDbContextOutbox`/middleware Wolverine), а это завязано на Wolverine-handler'ы — наш продьюсер `ReceiptScanService` обычный сервис. Поэтому `ReceiptFetchRequested` публикуется **после** коммита, а долговечность обеспечивается строкой `Receipt` (источник истины) + recurring-диспетчером: потерянное «wake-up»-сообщение восстанавливается следующим проходом sweep. Очередь подключена только `WolverineFx` + `WolverineFx.RabbitMQ`. Вернуться к durable-outbox — когда Weasel перейдёт на Npgsql 10. |
+| Глобальная FIFO-очередь + round-robin (1 воркер) | Не превышаем лимит провайдера, не зовём API параллельно, честное распределение между юзерами (новые сканы входят через round-robin dispatch, не прямым enqueue) |
 | Async импорт/экспорт через MinIO + BackgroundTask | Тяжёлые операции вне request-потока; файлы — в приватном S3-бакете; скачивание через ручку сервиса (стрим + проверка владельца + rate-limit), без presigned URL; object key — криптослучайный токен |
 | EF Core global query filters | Изоляция по UserId по умолчанию, а не дисциплиной разработчика; admin — IgnoreQueryFilters |
 | Redis fail-closed для квоты провайдера | Потеря счётчика не должна приводить к превышению лимита и бану ключа |
+| Feature-gate загрузки чеков по токену провайдера | Нет токена ProverkaCheka → сканирование отключено целиком: `scan-qr` отдаёт `503` с кодом `receipt_scanning_disabled`, фоновые чеки в очереди ставятся на паузу (не жгут retry-бюджет), а `GET /api/v1/capabilities` (`{ receiptScanning, fnsImport }`) сообщает фронту, что выключить. **Флаг проверяется в рантайме**: токен можно добавить на бэке независимо от деплоя фронта, поэтому SPA не хардкодит доступность, а опрашивает `capabilities`. `fnsImport` намеренно завязан на тот же токен (единый «раздел чеков»), хотя импорт из ФНС технически провайдер не вызывает — расцепить, если импорт понадобится отдельно. |
 | nginx как единственный публичный сервис | Внутренние панели (Studio, RabbitMQ, MinIO console) не выставляются в интернет; TLS на nginx |
 | Hangfire Dashboard отключён | Не выставляем админ-UI в публичный контур; наблюдаемость — через метрики/логи |
 

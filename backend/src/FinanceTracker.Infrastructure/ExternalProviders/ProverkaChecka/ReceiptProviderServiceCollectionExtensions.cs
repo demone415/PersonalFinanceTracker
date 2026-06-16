@@ -41,6 +41,9 @@ public static class ReceiptProviderServiceCollectionExtensions
 
         services.AddScoped<IReceiptRateLimiter, RedisReceiptRateLimiter>();
 
+        // Feature gate: scanning is on only when the provider token is configured.
+        services.AddSingleton<IReceiptFeatureGate, ProverkaCheckaReceiptFeatureGate>();
+
         // Refit client → typed HttpClient with the provider base address, then the
         // resilience pipeline. The pipeline's defaults already treat 5xx/408/timeouts
         // and HttpRequestException as transient (HttpClientResiliencePredicates).

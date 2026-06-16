@@ -22,6 +22,10 @@ public static class ObservabilityExtensions
                 .AddMeter(MeterName)
                 .AddPrometheusExporter());
 
+        // Domain gauges on MeterName: receipt queue length + remaining provider
+        // quota (ARCHITECTURE.md §11.7), refreshed by a background poller.
+        services.AddHostedService<ReceiptQueueMetrics>();
+
         return services;
     }
 }
