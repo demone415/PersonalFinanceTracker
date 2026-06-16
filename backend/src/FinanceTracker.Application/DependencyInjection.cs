@@ -1,4 +1,5 @@
 using FinanceTracker.Application.Features.Accruals;
+using FinanceTracker.Application.Features.Budgets;
 using FinanceTracker.Application.Features.Categories;
 using FinanceTracker.Application.Features.Dashboard;
 using FinanceTracker.Application.Features.Receipts;
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<CreateCategoryRequestValidator>();
 
         services.AddScoped<CategoryService>();
+        services.AddScoped<BudgetService>();
         services.AddScoped<AccrualService>();
         services.AddScoped<DashboardService>();
 

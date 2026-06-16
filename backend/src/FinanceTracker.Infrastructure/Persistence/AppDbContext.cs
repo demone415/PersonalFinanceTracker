@@ -18,6 +18,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
     public DbSet<Accrual> Accruals => Set<Accrual>();
     public DbSet<AccrualTag> AccrualTags => Set<AccrualTag>();
     public DbSet<Receipt> Receipts => Set<Receipt>();

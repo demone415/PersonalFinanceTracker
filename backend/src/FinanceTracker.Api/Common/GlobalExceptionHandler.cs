@@ -20,6 +20,7 @@ public sealed class GlobalExceptionHandler(IProblemDetailsService problemDetails
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
             ForbiddenAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
+            ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
             FeatureDisabledException => (StatusCodes.Status503ServiceUnavailable, "Feature Disabled"),
             _ => (0, string.Empty),
         };

@@ -88,6 +88,13 @@ public static class DatabaseSeeder
         AddAccruals(ctx, user1Id,  85_000m, 35_000m, seed, new Random(42));
         AddAccruals(ctx, user2Id, 120_000m, 50_000m, seed, new Random(99));
 
+        // 6. Monthly budgets — 3 for user1 in the current seed month (June 2026),
+        // so the progress view has data on first launch.
+        ctx.MonthlyBudgets.AddRange(
+            new MonthlyBudget(user1Id, CatGroceries,   2026, 6, 30_000m),
+            new MonthlyBudget(user1Id, CatRestaurants, 2026, 6, 10_000m),
+            new MonthlyBudget(user1Id, CatTransport,   2026, 6,  8_000m));
+
         await ctx.SaveChangesAsync(cancellationToken);
         logger.LogInformation("[Seeder] Done.");
     }
