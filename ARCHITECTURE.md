@@ -796,12 +796,12 @@ jobs:
 ### Epic 4: Сканирование QR-чеков
 
 **Story 4.1: Провайдер ПроверкаЧека**
-- [ ] T4.1.1 Интерфейс `IReceiptProvider` + Refit клиент `ProverkaCheckaClient`
-- [ ] T4.1.2 Polly политики (retry + circuit breaker) для Refit клиента
-- [ ] T4.1.3 Rate limiter (≤15/день) через Redis INCR + TTL; **fail-closed при недоступности Redis**
-- [ ] T4.1.4 Маппинг ответа API → Receipt + ReceiptItems (вручную)
-- [ ] T4.1.5 Валидация строки QR (формат `t=&s=&fn=&i=&fp=&n=`) до постановки в очередь
-- [ ] T4.1.6 Добавить `Receipt.UserId` + per-user дневной cap на запросы к провайдеру
+- [x] T4.1.1 Интерфейс `IReceiptProvider` + Refit клиент `ProverkaCheckaClient`
+- [x] T4.1.2 Polly политики (retry + circuit breaker) для Refit клиента
+- [x] T4.1.3 Rate limiter (≤15/день) через Redis INCR + TTL; **fail-closed при недоступности Redis**
+- [x] T4.1.4 Маппинг ответа API → Receipt + ReceiptItems (вручную)
+- [x] T4.1.5 Валидация строки QR (формат `t=&s=&fn=&i=&fp=&n=`) до постановки в очередь
+- [x] T4.1.6 Добавить `Receipt.UserId` + per-user дневной cap на запросы к провайдеру
 
 **Story 4.2: Фоновая обработка чеков**
 - [ ] T4.2.1 Wolverine message `ReceiptFetchRequested` + consumer handler; DLQ для терминальных ошибок

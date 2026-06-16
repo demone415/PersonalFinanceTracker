@@ -2,6 +2,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using FinanceTracker.Application.Common.Interfaces;
 using FinanceTracker.Infrastructure.Caching;
+using FinanceTracker.Infrastructure.ExternalProviders.ProverkaChecka;
 using FinanceTracker.Infrastructure.Identity;
 using FinanceTracker.Infrastructure.Persistence;
 using FinanceTracker.Infrastructure.Persistence.Interceptors;
@@ -54,6 +55,11 @@ public static class DependencyInjection
 
         AddObjectStorage(services, configuration);
         AddCaching(services, configuration);
+
+        // External receipt provider (Story 4.1): Refit client + Polly resilience,
+        // and the Redis-backed daily-quota rate limiter (fail-closed).
+        services.AddReceiptProvider(configuration);
+
         AddHealthChecks(services, configuration, connectionString);
 
         return services;

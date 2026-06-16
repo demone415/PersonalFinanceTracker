@@ -13,6 +13,11 @@
     <ProjectReference Include="..\FinanceTracker.Domain\FinanceTracker.Domain.csproj" />
   </ItemGroup>
 
+  <!-- Expose internal provider types (Refit client, models, provider) to unit tests. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="FinanceTracker.UnitTests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
@@ -26,6 +31,15 @@
   <!-- Object storage (provider-agnostic S3 client) -->
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" />
+  </ItemGroup>
+
+  <!-- External receipt provider (ProverkaCheka): Refit client + Polly resilience;
+       StackExchange.Redis backs the daily-quota rate limiter. -->
+  <ItemGroup>
+    <PackageReference Include="Refit" />
+    <PackageReference Include="Refit.HttpClientFactory" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <!-- Readiness probes -->
