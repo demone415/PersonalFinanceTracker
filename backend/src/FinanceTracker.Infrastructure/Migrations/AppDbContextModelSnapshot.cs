@@ -349,6 +349,12 @@ namespace FinanceTracker.Infrastructure.Migrations
                     b.Property<int>("Year")
                         .HasColumnType("integer");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");

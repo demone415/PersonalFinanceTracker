@@ -33,5 +33,13 @@ internal sealed class MonthlyBudgetConfiguration : IEntityTypeConfiguration<Mont
             .WithMany()
             .HasForeignKey(b => b.CategoryId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Optimistic locking via PostgreSQL xmin system column (ARCHITECTURE.md §4).
+        // xmin is a PG system column (type xid → uint); no migration column is added.
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .HasColumnName("xmin")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }

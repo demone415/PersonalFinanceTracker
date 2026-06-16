@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { budgetApi } from './budget-api'
-import type { BudgetInput, BudgetUpdateInput } from '../model/types'
+import type { BudgetInput, BudgetProgress, BudgetUpdateInput } from '../model/types'
 
 const budgetsKey = ['budgets'] as const
 
@@ -12,33 +12,74 @@ export function useBudgetProgress(year?: number, month?: number) {
   })
 }
 
-/** Invalidates every budget query (list + progress for all months) after a write. */
-function useInvalidateBudgets() {
-  const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: budgetsKey })
+/** Recomputes the derived progress fields after a limit change (mirrors the backend). */
+function applyLimit(b: BudgetProgress, input: BudgetUpdateInput): BudgetProgress {
+  const percentage =
+    input.limitAmount > 0 ? Math.round((b.spentAmount / input.limitAmount) * 1000) / 10 : 0
+  return {
+    ...b,
+    limitAmount: input.limitAmount,
+    currency: input.currency,
+    remainingAmount: input.limitAmount - b.spentAmount,
+    percentage,
+  }
+}
+
+/** Optimistically patches every cached progress list and returns a rollback snapshot. */
+function patchProgressCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  patch: (list: BudgetProgress[]) => BudgetProgress[],
+): Array<[QueryKey, BudgetProgress[] | undefined]> {
+  const snapshots = queryClient.getQueriesData<BudgetProgress[]>({ queryKey: budgetsKey })
+  for (const [key, data] of snapshots) {
+    if (data) queryClient.setQueryData<BudgetProgress[]>(key, patch(data))
+  }
+  return snapshots
 }
 
 export function useCreateBudget() {
-  const invalidate = useInvalidateBudgets()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: BudgetInput) => budgetApi.create(input),
-    onSettled: () => invalidate(),
+    // The server assigns the id and computes spend, so refetch on completion
+    // rather than guessing the derived progress fields (same as category create).
+    onSettled: () => queryClient.invalidateQueries({ queryKey: budgetsKey }),
   })
 }
 
 export function useUpdateBudget() {
-  const invalidate = useInvalidateBudgets()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: BudgetUpdateInput }) =>
       budgetApi.update(id, input),
-    onSettled: () => invalidate(),
+    onMutate: async ({ id, input }) => {
+      await queryClient.cancelQueries({ queryKey: budgetsKey })
+      const snapshots = patchProgressCaches(queryClient, (list) =>
+        list.map((b) => (b.budgetId === id ? applyLimit(b, input) : b)),
+      )
+      return { snapshots }
+    },
+    onError: (_error, _vars, context) => {
+      context?.snapshots.forEach(([key, data]) => queryClient.setQueryData(key, data))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: budgetsKey }),
   })
 }
 
 export function useDeleteBudget() {
-  const invalidate = useInvalidateBudgets()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => budgetApi.remove(id),
-    onSettled: () => invalidate(),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: budgetsKey })
+      const snapshots = patchProgressCaches(queryClient, (list) =>
+        list.filter((b) => b.budgetId !== id),
+      )
+      return { snapshots }
+    },
+    onError: (_error, _vars, context) => {
+      context?.snapshots.forEach(([key, data]) => queryClient.setQueryData(key, data))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: budgetsKey }),
   })
 }

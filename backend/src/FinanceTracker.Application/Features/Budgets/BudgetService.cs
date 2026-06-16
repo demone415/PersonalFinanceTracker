@@ -22,9 +22,11 @@ public sealed class BudgetService(
     {
         var query = db.MonthlyBudgets.AsQueryable();
 
+        // Apply the filter whenever a value is supplied — an out-of-range month
+        // then yields an empty result rather than being silently ignored.
         if (year.HasValue)
             query = query.Where(b => b.Year == year.Value);
-        if (month is >= 1 and <= 12)
+        if (month.HasValue)
             query = query.Where(b => b.Month == month.Value);
 
         return await query
@@ -72,8 +74,12 @@ public sealed class BudgetService(
         if (!categoryExists)
             throw new NotFoundException(nameof(Category), request.CategoryId);
 
+        // Scope by owner explicitly: the unique index is (UserId, CategoryId,
+        // Year, Month), and an admin bypasses the global filter — without this an
+        // admin would get a false conflict against another user's budget.
         var duplicate = await db.MonthlyBudgets.AnyAsync(
-            b => b.CategoryId == request.CategoryId
+            b => b.UserId == userId
+                 && b.CategoryId == request.CategoryId
                  && b.Year == request.Year
                  && b.Month == request.Month,
             cancellationToken);
@@ -114,10 +120,15 @@ public sealed class BudgetService(
     public async Task<IReadOnlyList<BudgetProgressDto>> GetProgressAsync(
         int? year, int? month, CancellationToken cancellationToken = default)
     {
+        var userId = currentUser.UserId
+            ?? throw new ForbiddenAccessException("Authentication is required to view budget progress.");
         var (y, m) = Normalize(year, month);
 
+        // Scope to the caller explicitly: this endpoint reports "my" progress, and
+        // an admin bypasses the global filter — without this both the budgets and
+        // the spend aggregate below would mix every user's data into one figure.
         var budgets = await db.MonthlyBudgets
-            .Where(b => b.Year == y && b.Month == m)
+            .Where(b => b.UserId == userId && b.Year == y && b.Month == m)
             .Select(b => new
             {
                 b.Id,
@@ -139,8 +150,12 @@ public sealed class BudgetService(
         var to = from.AddMonths(1);
         var categoryIds = budgets.Select(b => b.CategoryId).ToList();
 
+        // Amounts are aggregated as stored, i.e. in the user's base currency —
+        // the same contract DashboardService relies on (Accrual.Currency /
+        // ExchangeRate carry the original transaction values for reference only).
         var spentByCategory = await db.Accruals
-            .Where(a => a.IncludeInStats
+            .Where(a => a.UserId == userId
+                        && a.IncludeInStats
                         && a.Date >= from && a.Date < to
                         && a.CategoryId != null && categoryIds.Contains(a.CategoryId.Value)
                         && (a.Type == AccrualType.Expense || a.Type == AccrualType.ReturnExpense))

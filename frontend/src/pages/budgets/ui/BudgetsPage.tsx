@@ -33,6 +33,7 @@ export function BudgetsPage() {
   const deleteMutation = useDeleteBudget()
 
   const [editing, setEditing] = useState<Editing>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function handleSubmit(values: BudgetFormValues) {
@@ -54,10 +55,9 @@ export function BudgetsPage() {
     }
   }
 
-  function handleDelete(budget: BudgetProgress) {
-    if (confirm(`Удалить бюджет «${budget.categoryName}»?`)) {
-      deleteMutation.mutate(budget.budgetId)
-    }
+  function handleDelete(budgetId: string) {
+    deleteMutation.mutate(budgetId)
+    setConfirmingId(null)
   }
 
   function openEdit(budget: BudgetProgress) {
@@ -133,12 +133,33 @@ export function BudgetsPage() {
                     <span className="font-medium">{b.categoryName}</span>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openEdit(b)}>
-                      Изменить
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(b)}>
-                      Удалить
-                    </Button>
+                    {confirmingId === b.budgetId ? (
+                      <>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(b.budgetId)}
+                        >
+                          Подтвердить
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setConfirmingId(null)}>
+                          Отмена
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => openEdit(b)}>
+                          Изменить
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setError(null); setConfirmingId(b.budgetId) }}
+                        >
+                          Удалить
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
 
