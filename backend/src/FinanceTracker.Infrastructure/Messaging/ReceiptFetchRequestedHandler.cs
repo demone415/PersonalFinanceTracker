@@ -5,8 +5,9 @@ using Microsoft.Extensions.Logging;
 namespace FinanceTracker.Infrastructure.Messaging;
 
 /// <summary>
-/// Wolverine consumer for <see cref="ReceiptFetchRequested"/> (T4.2.1): hands the
-/// receipt to the global FIFO Hangfire queue for sequential processing. Kept thin
+/// Wolverine consumer for <see cref="ReceiptFetchRequested"/> (T4.2.1): triggers a
+/// round-robin dispatch pass on the global FIFO Hangfire queue, which then picks
+/// up this (and every other due) receipt fairly across users (T4.2.2). Kept thin
 /// so a failure here is rare; on repeated failure Wolverine retries and then
 /// dead-letters the message (see the transport configuration).
 /// </summary>
@@ -18,9 +19,9 @@ public sealed class ReceiptFetchRequestedHandler
         ILogger<ReceiptFetchRequestedHandler> logger)
     {
         logger.LogInformation(
-            "Queueing receipt {ReceiptId} (user {UserId}) for background fetch.",
+            "Receipt {ReceiptId} (user {UserId}) scanned; requesting dispatch pass.",
             message.ReceiptId, message.UserId);
 
-        scheduler.Enqueue(message.ReceiptId);
+        scheduler.RequestDispatch();
     }
 }

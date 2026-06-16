@@ -7,9 +7,17 @@ namespace FinanceTracker.Application.Common.Interfaces;
 /// </summary>
 public interface IReceiptFetchScheduler
 {
-    /// <summary>Queues an immediate fetch attempt for the receipt.</summary>
-    void Enqueue(Guid receiptId);
+    /// <summary>
+    /// Triggers a dispatch pass over all currently-due receipts. New scans enter
+    /// through here (not via a direct per-receipt enqueue) so the single worker
+    /// processes users round-robin (T4.2.2) instead of in raw arrival order.
+    /// </summary>
+    void RequestDispatch();
 
-    /// <summary>Schedules the next fetch attempt after <paramref name="delay"/> (retry scheme).</summary>
+    /// <summary>
+    /// Schedules the next attempt for one receipt after <paramref name="delay"/>
+    /// (the retry scheme, T4.2.3). A single rescheduled receipt needs precise
+    /// timing, not fairness, so it is queued directly.
+    /// </summary>
     void ScheduleRetry(Guid receiptId, TimeSpan delay);
 }

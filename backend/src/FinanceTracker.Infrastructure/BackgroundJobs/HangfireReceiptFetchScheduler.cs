@@ -11,8 +11,8 @@ namespace FinanceTracker.Infrastructure.BackgroundJobs;
 /// </summary>
 internal sealed class HangfireReceiptFetchScheduler(IBackgroundJobClient client) : IReceiptFetchScheduler
 {
-    public void Enqueue(Guid receiptId) =>
-        client.Enqueue<ReceiptFetchJob>(job => job.RunAsync(receiptId, CancellationToken.None));
+    public void RequestDispatch() =>
+        client.Enqueue<ReceiptDispatchJob>(job => job.DispatchAsync(CancellationToken.None));
 
     public void ScheduleRetry(Guid receiptId, TimeSpan delay) =>
         client.Schedule<ReceiptFetchJob>(job => job.RunAsync(receiptId, CancellationToken.None), delay);

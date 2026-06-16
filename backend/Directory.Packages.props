@@ -30,6 +30,9 @@
   <ItemGroup>
     <PackageVersion Include="WolverineFx" Version="6.10.0" />
     <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.10.0" />
+    <!-- Wolverine 6 no longer bundles the Roslyn runtime compiler; this package
+         auto-registers it so handler/middleware code is generated at startup. -->
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.10.0" />
   </ItemGroup>
   <!-- Background jobs: Hangfire with PostgreSQL persistence (FIFO receipts queue,
        WorkerCount = 1, scheduled retries via BackgroundJob.Schedule). -->
@@ -84,5 +87,10 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Moq" Version="4.20.72" />
+    <!-- Integration tests: real Postgres + RabbitMQ via Testcontainers; SkippableFact
+         lets them skip cleanly where Docker is unavailable. -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.12.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.12.0" />
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
   </ItemGroup>
 </Project>
