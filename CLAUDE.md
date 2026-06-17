@@ -130,6 +130,7 @@ Auth is handled by **Supabase GoTrue** (runs as a Docker service), not by the .N
 - **Caching**: FusionCache with Redis backplane. NuGet packages: `ZiggyCreatures.FusionCache` + `ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis` + `ZiggyCreatures.FusionCache.Serialization.SystemTextJson` + `Microsoft.Extensions.Caching.StackExchangeRedis`. Cache dashboard aggregates (TTL 5 min).
 - **Logging**: Serilog only; configure sinks in `appsettings.json`, not in code.
 - **API versions**: URL-segment versioning (`/api/v1/`, `/api/v2/`). All new endpoints go under `v1` initially.
+- **JSON enums as strings**: the API serializes enums as their **string names** via `JsonStringEnumConverter` (registered in `Program.cs` on `AddControllers().AddJsonOptions(...)`). The SPA's types are string unions (e.g. `AccrualType = 'Income' | …`), so **never** rely on integer enum output — it silently breaks client logic (e.g. an income rendered as an outflow). Add new client-facing enums expecting string values on the wire.
 - **Async import/export**: import/export are **always async** — `POST /accruals/import` and `POST /accruals/export` enqueue a Hangfire job, return `{ jobId }` (202). Status via `GET /jobs/{id}`. The result is **streamed through the service** at `GET /jobs/{id}/result` — **no presigned URLs**: the backend streams the object from a private MinIO bucket, enforces ownership via `BackgroundTask.UserId`, and the endpoint is rate-limited. State lives in `BackgroundTask`. Never do import/export inline in the request.
 - **Object storage**: MinIO (S3-compatible), **private** bucket `finance-files`, accessed via the Minio/AWS S3 client. Object keys are cryptographically random opaque tokens (256-bit, never exposed to the client); files are served only by streaming through the API, never by a presigned URL.
 - **Health checks**: expose `/health/live` (liveness) and `/health/ready` (readiness with Postgres/Redis/RabbitMQ/MinIO probes).
@@ -157,9 +158,11 @@ Feature Slices use service classes, not Command/Query objects. Each feature has 
 - **State**: TanStack Query v5 for server state; Zustand for client state (theme, auth, UI).
 - **Optimistic updates**: use TanStack Query `optimisticMutation` for create/update/delete.
 - **Loading**: show shadcn/ui `Skeleton` components before data arrives — no raw spinners.
-- **Theme**: dark by default; Tailwind `darkMode: 'class'`; user toggle stored in Zustand + localStorage.
+- **Theme**: dark by default; Tailwind `darkMode: 'class'` (the `.dark` class lives on `<html>`); user toggle stored in Zustand + localStorage. Theme syncs across tabs via a `storage`-event listener in `shared/lib/theme.ts`. `index.css` sets `color-scheme` per theme.
 - **Animations**: Framer Motion for route/component transitions; Lottie for empty states.
-- **Forms**: React Hook Form + Zod (schema mirrors backend FluentValidation rules).
+- **Forms**: React Hook Form + Zod (schema mirrors backend FluentValidation rules). Wire non-native controls (`Select`, `DatePicker`, `DateTimePicker`) through RHF `Controller`.
+- **No native `<select>` / date inputs**: they don't follow the dark theme (the OS draws the option list / calendar). Use the themed `shared/ui` primitives instead — `Select` (Radix), `Popover`, `Calendar` (react-day-picker, month/year dropdowns), `DatePicker` (date), `DateTimePicker` (date+time). Radix `Select` forbids an empty-string value → use a sentinel (e.g. `__any__`/`__none__`) for "any/none".
+- **Money & dates**: render accrual amounts in a neutral colour with a direction icon (↙ inflow / ↗ outflow), not coloured text or +/− signs; direction comes from `isInflow(type)` in `entities/accrual`. Format date-times with `formatDateTimeRu` (`dd.MM.yyyy HH:mm:ss`) from `shared/lib/format`. Currency lists come from `shared/lib/currencies`.
 
 ---
 
