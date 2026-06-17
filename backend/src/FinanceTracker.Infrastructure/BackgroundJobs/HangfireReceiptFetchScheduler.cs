@@ -9,7 +9,7 @@ namespace FinanceTracker.Infrastructure.BackgroundJobs;
 /// <see cref="ReceiptFetchJob"/>; that queue is served by a single worker, so
 /// processing is strictly sequential (T4.2.2).
 /// </summary>
-internal sealed class HangfireReceiptFetchScheduler(IBackgroundJobClient client) : IReceiptFetchScheduler
+public sealed class HangfireReceiptFetchScheduler(IBackgroundJobClient client) : IReceiptFetchScheduler
 {
     public void RequestDispatch() =>
         client.Enqueue<ReceiptDispatchJob>(job => job.DispatchAsync(CancellationToken.None));
