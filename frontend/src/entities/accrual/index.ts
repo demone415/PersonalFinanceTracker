@@ -15,6 +15,7 @@ export type {
 
 export {
   useAccruals,
+  useRefreshAccruals,
   useAccrual,
   useReceipt,
   useCreateAccrual,

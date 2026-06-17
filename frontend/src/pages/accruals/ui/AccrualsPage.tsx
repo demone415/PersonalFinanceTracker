@@ -4,6 +4,7 @@ import {
   useAccruals,
   useCreateAccrual,
   useDeleteAccrual,
+  useRefreshAccruals,
   type AccrualFilter,
   type AccrualListItem,
 } from '@/entities/accrual'
@@ -47,10 +48,14 @@ export function AccrualsPage() {
   const { data, isPending } = useAccruals(filter)
   const createMutation = useCreateAccrual()
   const deleteMutation = useDeleteAccrual()
+  const refreshAccruals = useRefreshAccruals()
 
   /** Replace filter fields (clearing pagination back to page 1) and sync URL. */
   function applyFilter(fields: Omit<AccrualFilter, 'page' | 'pageSize'>) {
     setSearchParams(filterToParams({ ...fields, pageSize: filter.pageSize }))
+    // Re-run the query even when the values are unchanged — otherwise identical
+    // URL params serve the cached result and "Применить" appears to do nothing.
+    refreshAccruals()
   }
 
   function goToPage(page: number) {

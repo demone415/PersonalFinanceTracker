@@ -21,6 +21,16 @@ export function useAccruals(filter: AccrualFilter = {}) {
   })
 }
 
+/**
+ * Returns a callback that forces the accrual lists to refetch. Used by the filter
+ * panel so pressing "Применить" re-runs the query even when the filter values are
+ * unchanged (identical URL params would otherwise serve the cached result).
+ */
+export function useRefreshAccruals() {
+  const qc = useQueryClient()
+  return () => qc.invalidateQueries({ queryKey: KEYS.list() })
+}
+
 export function useAccrual(id: string) {
   return useQuery({
     queryKey: KEYS.detail(id),
