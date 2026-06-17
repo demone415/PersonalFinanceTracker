@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { LucideIcon } from '@/shared/ui/lucide-icon'
 import {
   useAccruals,
   useCreateAccrual,
   useDeleteAccrual,
   useRefreshAccruals,
+  isInflow,
   type AccrualFilter,
   type AccrualListItem,
 } from '@/entities/accrual'
@@ -25,16 +28,8 @@ const TYPE_LABELS: Record<string, string> = {
   ReturnExpense: 'Возврат расхода',
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  Income: 'text-green-500',
-  ReturnIncome: 'text-green-400',
-  Expense: 'text-red-500',
-  ReturnExpense: 'text-red-400',
-}
-
 function formatAmount(item: AccrualListItem) {
-  const sign = item.type === 'Income' || item.type === 'ReturnIncome' ? '+' : '−'
-  return `${sign}${item.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ${item.currency}`
+  return `${item.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ${item.currency}`
 }
 
 export function AccrualsPage() {
@@ -129,14 +124,19 @@ export function AccrualsPage() {
                 <div className="flex items-center gap-4 min-w-0">
                   {item.categoryColor && (
                     <span
-                      className="flex size-9 shrink-0 items-center justify-center rounded-md text-xs"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-md"
                       style={{ backgroundColor: `${item.categoryColor}22`, color: item.categoryColor }}
                     >
-                      {item.categoryIcon ? '●' : '?'}
+                      <LucideIcon name={item.categoryIcon ?? 'ellipsis'} className="size-4" />
                     </span>
                   )}
                   <div className="min-w-0">
-                    <p className={`font-semibold ${TYPE_COLORS[item.type] ?? ''}`}>
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      {isInflow(item.type) ? (
+                        <ArrowDownLeft className="size-4 shrink-0 text-green-500" aria-label="Приход" />
+                      ) : (
+                        <ArrowUpRight className="size-4 shrink-0 text-red-500" aria-label="Расход" />
+                      )}
                       {formatAmount(item)}
                     </p>
                     <p className="truncate text-sm text-muted-foreground">

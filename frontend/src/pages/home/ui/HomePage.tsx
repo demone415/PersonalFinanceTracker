@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { QrCode, Plus, ArrowRight } from 'lucide-react'
+import { QrCode, Plus, ArrowRight, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import {
   useAccruals,
   type AccrualListItem,
@@ -151,8 +151,7 @@ function StatCard({
 }
 
 function RecentRow({ item }: { item: AccrualListItem }) {
-  const sign = isInflow(item.type) ? '+' : '−'
-  const color = isInflow(item.type) ? 'text-green-500' : 'text-red-500'
+  const inflow = isInflow(item.type)
   return (
     <li>
       <Link
@@ -177,8 +176,13 @@ function RecentRow({ item }: { item: AccrualListItem }) {
             {new Date(item.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
           </p>
         </div>
-        <span className={`shrink-0 text-sm font-semibold tabular-nums ${color}`}>
-          {sign}{formatMoney(item.amount, item.currency)}
+        <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums">
+          {inflow ? (
+            <ArrowDownLeft className="size-4 shrink-0 text-green-500" aria-label="Приход" />
+          ) : (
+            <ArrowUpRight className="size-4 shrink-0 text-red-500" aria-label="Расход" />
+          )}
+          {formatMoney(item.amount, item.currency)}
         </span>
       </Link>
     </li>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import {
   useAccrual,
   useUpdateAccrual,
@@ -7,6 +8,7 @@ import {
   useAddReceiptItem,
   useUpdateReceiptItem,
   useDeleteReceiptItem,
+  isInflow,
   type ReceiptItem,
   type ReceiptItemInput,
 } from '@/entities/accrual'
@@ -14,7 +16,9 @@ import { AccrualForm, type AccrualFormValues } from '@/features/accrual-form'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import { LucideIcon } from '@/shared/ui/lucide-icon'
 import { Skeleton } from '@/shared/ui/skeleton'
+import { formatDateTimeRu } from '@/shared/lib/format'
 
 function ReceiptItemRow({
   item,
@@ -192,24 +196,46 @@ export function AccrualDetailPage() {
     )
   }
 
-  const typeSign = accrual.type === 'Income' || accrual.type === 'ReturnIncome' ? '+' : '−'
-  const amountColor = accrual.type === 'Income' || accrual.type === 'ReturnIncome'
-    ? 'text-green-500' : 'text-red-500'
+  const inflow = isInflow(accrual.type)
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <Link to="/accruals" className="text-sm text-muted-foreground hover:underline">
-            ← К списку
-          </Link>
-          <h1 className={`text-2xl font-semibold ${amountColor}`}>
-            {typeSign}{accrual.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} {accrual.currency}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {new Date(accrual.date).toLocaleString('ru-RU')}
-            {accrual.categoryName && <> · {accrual.categoryName}</>}
-          </p>
+      <header className="flex items-start justify-between">
+        <div className="flex items-start gap-4">
+          {accrual.categoryColor && (
+            <span
+              className="mt-6 flex size-11 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: `${accrual.categoryColor}22`, color: accrual.categoryColor }}
+            >
+              <LucideIcon name={accrual.categoryIcon ?? 'ellipsis'} className="size-5" />
+            </span>
+          )}
+          <div>
+            <Link to="/accruals" className="text-sm text-muted-foreground hover:underline">
+              ← К списку
+            </Link>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold">
+              {inflow ? (
+                <ArrowDownLeft className="size-6 shrink-0 text-green-500" aria-label="Приход" />
+              ) : (
+                <ArrowUpRight className="size-6 shrink-0 text-red-500" aria-label="Расход" />
+              )}
+              {accrual.amount.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} {accrual.currency}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {formatDateTimeRu(accrual.date)}
+              {accrual.categoryName && <> · {accrual.categoryName}</>}
+            </p>
+            <span
+              className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs ${
+                accrual.includeInStats
+                  ? 'bg-green-500/15 text-green-500'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {accrual.includeInStats ? 'Учитывается в статистике' : 'Не учитывается в статистике'}
+            </span>
+          </div>
         </div>
         {!editMode && (
           <Button variant="outline" onClick={() => setEditMode(true)}>Редактировать</Button>

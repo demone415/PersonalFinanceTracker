@@ -28,3 +28,5 @@ export {
   useReceiptStatus,
   useExportAccruals,
 } from './api/accrual-queries'
+
+export { isInflow } from './lib/direction'
