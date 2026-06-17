@@ -6,6 +6,10 @@ namespace FinanceTracker.Infrastructure.ExternalProviders.ProverkaChecka;
 /// Wire model for the ПроверкаЧека <c>POST /api/v1/check/get</c> response
 /// (see proverka_cheka_documentation_api.docx). Only the fields the app maps are
 /// modelled; everything else (HTML render, request echo) is ignored.
+/// The provider is loosely typed — numbers arrive quoted or bare, id-like fields
+/// flip between string and number, and absent objects come back as <c>[]</c> —
+/// so scalars are nullable and the flexible/tolerant converters absorb the rest
+/// (a single odd field must never sink the whole response).
 /// </summary>
 internal sealed class ProverkaCheckaResponse
 {
@@ -14,12 +18,14 @@ internal sealed class ProverkaCheckaResponse
     public int Code { get; init; }
 
     [JsonPropertyName("data")]
+    [JsonConverter(typeof(TolerantObjectConverter<ProverkaCheckaData>))]
     public ProverkaCheckaData? Data { get; init; }
 }
 
 internal sealed class ProverkaCheckaData
 {
     [JsonPropertyName("json")]
+    [JsonConverter(typeof(TolerantObjectConverter<ProverkaCheckaJson>))]
     public ProverkaCheckaJson? Json { get; init; }
 }
 
@@ -39,6 +45,7 @@ internal sealed class ProverkaCheckaJson
     public string? RetailPlaceAddressLegacy { get; init; }
 
     [JsonPropertyName("userInn")]
+    [JsonConverter(typeof(FlexibleStringConverter))]
     public string? UserInn { get; init; }
 
     [JsonPropertyName("shiftNumber")]
@@ -59,12 +66,14 @@ internal sealed class ProverkaCheckaJson
     public int? TaxationType { get; init; }
 
     [JsonPropertyName("fiscalDriveNumber")]
+    [JsonConverter(typeof(FlexibleStringConverter))]
     public string? FiscalDriveNumber { get; init; }
 
     [JsonPropertyName("fiscalDocumentNumber")]
     public long? FiscalDocumentNumber { get; init; }
 
     [JsonPropertyName("fiscalSign")]
+    [JsonConverter(typeof(FlexibleStringConverter))]
     public string? FiscalSign { get; init; }
 
     [JsonPropertyName("items")]
@@ -81,12 +90,12 @@ internal sealed class ProverkaCheckaItem
 
     /// <summary>Unit price in kopecks.</summary>
     [JsonPropertyName("price")]
-    public long Price { get; init; }
+    public long? Price { get; init; }
 
     [JsonPropertyName("quantity")]
-    public decimal Quantity { get; init; }
+    public decimal? Quantity { get; init; }
 
     /// <summary>Line total in kopecks.</summary>
     [JsonPropertyName("sum")]
-    public long Sum { get; init; }
+    public long? Sum { get; init; }
 }

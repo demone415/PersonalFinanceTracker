@@ -118,6 +118,70 @@ public class ProverkaCheckaProviderTests
     }
 
     [Fact]
+    public async Task GetReceiptAsync_LooselyTypedScalars_AreParsed()
+    {
+        // The live provider flips id fields between string and number, quotes some
+        // numbers, and may omit item scalars — none of which must break parsing.
+        const string body = """
+        {
+          "code": 1,
+          "data": {
+            "json": {
+              "user": "ООО Ромашка",
+              "retailPlaceAddress": "Москва",
+              "userInn": 7700000000,
+              "totalSum": "34993",
+              "fiscalDriveNumber": 9282440300682838,
+              "fiscalDocumentNumber": "46534",
+              "fiscalSign": 1273019065,
+              "items": [
+                { "name": "Хлеб", "sum": 7100 }
+              ]
+            }
+          }
+        }
+        """;
+        var provider = BuildProvider(HttpStatusCode.OK, body);
+
+        var result = await provider.GetReceiptAsync("t=1&s=1&fn=1&i=1&fp=1&n=1");
+
+        Assert.True(result.IsSuccess);
+        var data = result.Data!;
+        Assert.Equal("7700000000", data.Inn);
+        Assert.Equal(34993, data.TotalSumInKopecks);
+        Assert.Equal("9282440300682838", data.FiscalDriveNumber);
+        Assert.Equal(46534, data.FiscalDocumentNumber);
+        Assert.Equal("1273019065", data.FiscalSign);
+        var item = Assert.Single(data.Items);
+        Assert.Equal(0m, item.Price);     // absent → 0
+        Assert.Equal(1m, item.Quantity);  // absent → 1
+        Assert.Equal(71.00m, item.Sum);
+    }
+
+    [Fact]
+    public async Task GetReceiptAsync_DataAsEmptyArray_DoesNotCrash()
+    {
+        // Some non-success responses send `data: []` instead of an object/null.
+        var provider = BuildProvider(HttpStatusCode.OK, """{ "code": 2, "data": [] }""");
+
+        var result = await provider.GetReceiptAsync("t=1&s=1&fn=1&i=1&fp=1&n=1");
+
+        Assert.Equal(ReceiptFetchOutcome.NotYetAvailable, result.Outcome);
+        Assert.Null(result.Data);
+    }
+
+    [Fact]
+    public async Task GetReceiptAsync_MalformedBody_IsProviderError()
+    {
+        var provider = BuildProvider(HttpStatusCode.OK, "not json at all");
+
+        var result = await provider.GetReceiptAsync("t=1&s=1&fn=1&i=1&fp=1&n=1");
+
+        Assert.Equal(ReceiptFetchOutcome.ProviderError, result.Outcome);
+        Assert.Null(result.Data);
+    }
+
+    [Fact]
     public async Task GetReceiptAsync_EmptyToken_Throws()
     {
         var handler = new StubHttpMessageHandler(HttpStatusCode.OK, """{ "code": 1 }""");

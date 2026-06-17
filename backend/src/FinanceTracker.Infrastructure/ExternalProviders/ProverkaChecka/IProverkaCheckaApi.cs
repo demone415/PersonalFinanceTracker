@@ -11,12 +11,14 @@ namespace FinanceTracker.Infrastructure.ExternalProviders.ProverkaChecka;
 internal interface IProverkaCheckaApi
 {
     /// <summary>
-    /// <c>POST /api/v1/check/get</c>. Business outcomes are conveyed by the body's
-    /// <c>code</c> field (even on HTTP 200); transport/5xx failures throw
+    /// <c>POST /api/v1/check/get</c>. Returns the raw response body so the provider
+    /// can parse it leniently and log it verbatim on a deserialization failure —
+    /// the provider's JSON is loosely typed. Business outcomes are conveyed by the
+    /// body's <c>code</c> field (even on HTTP 200); transport/5xx failures throw
     /// <see cref="ApiException"/> and are retried by the resilience handler.
     /// </summary>
     [Post("/api/v1/check/get")]
-    Task<ProverkaCheckaResponse> GetCheckAsync(
+    Task<string> GetCheckAsync(
         [Body(BodySerializationMethod.UrlEncoded)] IDictionary<string, object> form,
         CancellationToken ct = default);
 }
