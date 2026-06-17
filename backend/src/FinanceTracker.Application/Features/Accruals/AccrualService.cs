@@ -82,6 +82,9 @@ public sealed class AccrualService(
         var userId = currentUser.UserId
             ?? throw new ForbiddenAccessException("Authentication required.");
 
+        await EnsureExchangeRateForForeignCurrencyAsync(
+            userId, request.Currency, request.ExchangeRate, cancellationToken);
+
         var accrual = new Accrual(
             userId,
             request.Amount,
@@ -110,6 +113,9 @@ public sealed class AccrualService(
         CancellationToken cancellationToken = default)
     {
         var accrual = await LoadOwnedAsync(id, cancellationToken);
+
+        await EnsureExchangeRateForForeignCurrencyAsync(
+            accrual.UserId, request.Currency, request.ExchangeRate, cancellationToken);
 
         accrual.Update(
             request.Amount,
@@ -220,6 +226,29 @@ public sealed class AccrualService(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Enforces the currency-aggregation contract at the source of truth: a
+    /// transaction in a currency other than the owner's base currency must carry an
+    /// exchange rate, otherwise <see cref="Accrual.AmountInBaseCurrency"/> would
+    /// silently treat it as 1:1 and skew every aggregate. The frontend enforces the
+    /// same rule, but the API is the source of truth (e.g. direct/imported writes).
+    /// </summary>
+    private async Task EnsureExchangeRateForForeignCurrencyAsync(
+        Guid ownerId, string currency, decimal? exchangeRate, CancellationToken cancellationToken)
+    {
+        if (exchangeRate is > 0m)
+            return;
+
+        var baseCurrency = await db.UserProfiles
+            .Where(p => p.Id == ownerId)
+            .Select(p => p.Currency)
+            .FirstOrDefaultAsync(cancellationToken) ?? "RUB";
+
+        if (!string.Equals(currency, baseCurrency, StringComparison.OrdinalIgnoreCase))
+            throw new ValidationException(
+                $"An exchange rate to the base currency ({baseCurrency}) is required for {currency} transactions.");
+    }
 
     /// <summary>
     /// Drops the owner's cached dashboard aggregates after a committed write.

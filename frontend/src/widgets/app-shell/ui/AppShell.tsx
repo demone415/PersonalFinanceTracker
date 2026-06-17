@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, PieChart, ArrowLeftRight, Shapes, Target, History,
-  QrCode, Shield, LogOut, X, Wallet, type LucideIcon,
+  QrCode, Shield, LogOut, X, Wallet, Settings, type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/shared/api/supabase'
 import { useSessionStore } from '@/entities/session'
@@ -25,6 +25,7 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/categories', label: 'Категории', icon: Shapes },
   { to: '/budgets', label: 'Бюджеты', icon: Target },
   { to: '/journal', label: 'Журнал', icon: History },
+  { to: '/settings', label: 'Настройки', icon: Settings },
 ]
 
 // Mobile bottom-bar tabs (the central scan FAB is rendered separately).
@@ -175,6 +176,7 @@ export function AppShell() {
             <SheetLink to="/dashboard" icon={PieChart} label="Аналитика" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/budgets" icon={Target} label="Бюджеты" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/journal" icon={History} label="Журнал" onClick={() => setMoreOpen(false)} />
+            <SheetLink to="/settings" icon={Settings} label="Настройки" onClick={() => setMoreOpen(false)} />
             {isAdmin && (
               <SheetLink to="/admin" icon={Shield} label="Администрирование" onClick={() => setMoreOpen(false)} />
             )}

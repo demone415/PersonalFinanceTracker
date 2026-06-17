@@ -160,13 +160,25 @@ public static class DatabaseSeeder
             ctx.Accruals.Add(MakeAccrual(userId, Rnd(rng, 200, 2_000),
                 mo.AddDays(rng.Next(0, 28)),
                 AccrualType.Expense, CatOther, "Разные расходы"));
+
+            // Multi-currency demo (Epic 8): one foreign-currency purchase in the
+            // last seed month, with the rate captured at transaction time. It
+            // lands in Groceries so both the dashboard and the budget progress
+            // show the converted (Amount × ExchangeRate) figure on first launch.
+            if (m == 5)
+                ctx.Accruals.Add(MakeAccrual(userId, Rnd(rng, 50, 120),
+                    mo.AddDays(14), AccrualType.Expense, CatGroceries,
+                    "Продукты (оплата картой за рубежом)",
+                    currency: "USD", exchangeRate: 92m));
         }
     }
 
     private static Domain.Entities.Accrual MakeAccrual(
         Guid userId, decimal amount, DateTimeOffset date,
-        AccrualType type, Guid? catId, string desc) =>
-        new(userId, amount, date, type, categoryId: catId, description: desc);
+        AccrualType type, Guid? catId, string desc,
+        string currency = "RUB", decimal? exchangeRate = null) =>
+        new(userId, amount, date, type,
+            currency: currency, categoryId: catId, description: desc, exchangeRate: exchangeRate);
 
     private static decimal Rnd(Random rng, decimal min, decimal max) =>
         Math.Round(min + (max - min) * (decimal)rng.NextDouble(), 2);

@@ -3,6 +3,7 @@ using FinanceTracker.Application.Features.Budgets;
 using FinanceTracker.Application.Features.Categories;
 using FinanceTracker.Application.Features.ChangeLog;
 using FinanceTracker.Application.Features.Dashboard;
+using FinanceTracker.Application.Features.Profile;
 using FinanceTracker.Application.Features.Receipts;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<AccrualService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<ChangeLogService>();
+        services.AddScoped<ProfileService>();
 
         // Receipt fetching (Story 4.2): the QR-scan producer and the background
         // processor that turns a provider outcome into a receipt state transition.

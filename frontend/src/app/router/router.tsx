@@ -9,6 +9,7 @@ import { AccrualsPage } from '@/pages/accruals'
 import { AccrualDetailPage } from '@/pages/accrual-detail'
 import { ScanPage } from '@/pages/scan'
 import { JournalPage } from '@/pages/journal'
+import { SettingsPage } from '@/pages/settings'
 import { AppShell } from '@/widgets/app-shell'
 import { ProtectedRoute } from './ProtectedRoute'
 import { AdminRoute } from './AdminRoute'
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
           { path: '/categories', element: <CategoriesPage /> },
           { path: '/budgets', element: <BudgetsPage /> },
           { path: '/journal', element: <JournalPage /> },
+          { path: '/settings', element: <SettingsPage /> },
           { path: '/scan', element: <ScanPage /> },
           {
             element: <AdminRoute />,

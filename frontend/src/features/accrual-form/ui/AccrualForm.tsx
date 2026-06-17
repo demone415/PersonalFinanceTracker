@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCategories } from '@/entities/category'
+import { useBaseCurrency } from '@/entities/profile'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import { formatMoney } from '@/shared/lib/format'
 import { accrualSchema, type AccrualFormValues } from '../model/accrual-schema'
 
 const ACCRUAL_TYPES = [
@@ -23,6 +26,7 @@ interface Props {
 
 export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, onCancel }: Props) {
   const { data: categories } = useCategories()
+  const baseCurrency = useBaseCurrency()
   const [tagInput, setTagInput] = useState('')
 
   const {
@@ -30,11 +34,13 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
     handleSubmit,
     watch,
     setValue,
-    formState: { errors },
+    setError,
+    clearErrors,
+    formState: { errors, dirtyFields },
   } = useForm<AccrualFormValues>({
     resolver: zodResolver(accrualSchema),
     defaultValues: {
-      currency: 'RUB',
+      currency: baseCurrency,
       includeInStats: true,
       type: 'Expense',
       tags: [],
@@ -43,6 +49,41 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
   })
 
   const tags = watch('tags') ?? []
+
+  // In create mode the transaction currency should follow the user's base
+  // currency, which may still be loading on first render; keep it in sync until
+  // the user edits the field. In edit mode defaultValues carries the saved
+  // currency, so leave it untouched.
+  const isEdit = defaultValues?.currency != null
+  useEffect(() => {
+    if (!isEdit && !dirtyFields.currency) {
+      setValue('currency', baseCurrency)
+    }
+  }, [isEdit, baseCurrency, dirtyFields.currency, setValue])
+
+  // Multi-currency (Epic 8): a foreign transaction needs the rate to the base
+  // currency captured at entry time so aggregates can convert it (T8.1.3).
+  const currency = (watch('currency') ?? '').trim().toUpperCase()
+  const isForeign = currency.length === 3 && currency !== baseCurrency.toUpperCase()
+  const amount = watch('amount')
+  const exchangeRate = watch('exchangeRate')
+
+  // Drop a stale rate when the currency reverts to the base one, so a base-
+  // currency accrual is never sent with a leftover multiplier.
+  useEffect(() => {
+    if (!isForeign && exchangeRate != null) {
+      setValue('exchangeRate', undefined)
+      clearErrors('exchangeRate')
+    }
+  }, [isForeign, exchangeRate, setValue, clearErrors])
+
+  function submit(values: AccrualFormValues) {
+    if (isForeign && !values.exchangeRate) {
+      setError('exchangeRate', { type: 'manual', message: `Укажите курс к ${baseCurrency}` })
+      return
+    }
+    onSubmit(isForeign ? values : { ...values, exchangeRate: null })
+  }
 
   function addTag() {
     const t = tagInput.trim()
@@ -57,7 +98,7 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         {/* Amount */}
         <div className="space-y-1">
@@ -104,6 +145,38 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
           {errors.currency && <p className="text-xs text-destructive">{errors.currency.message}</p>}
         </div>
       </div>
+
+      {/* Exchange rate — only for a currency other than the base one (Epic 8) */}
+      {isForeign && (
+        <div className="space-y-1 rounded-md border border-dashed p-3">
+          <Label>Курс к {baseCurrency} *</Label>
+          <Input
+            type="number"
+            step="0.000001"
+            min="0"
+            placeholder={`1 ${currency} = ? ${baseCurrency}`}
+            {...register('exchangeRate', {
+              setValueAs: (v) => {
+                if (v === '' || v === null || v === undefined) return undefined
+                const n = Number(v)
+                return Number.isNaN(n) ? undefined : n
+              },
+            })}
+          />
+          {amount && exchangeRate ? (
+            <p className="text-xs text-muted-foreground">
+              ≈ {formatMoney(amount * exchangeRate, baseCurrency)}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Курс на момент операции для пересчёта в основную валюту
+            </p>
+          )}
+          {errors.exchangeRate && (
+            <p className="text-xs text-destructive">{errors.exchangeRate.message}</p>
+          )}
+        </div>
+      )}
 
       {/* Category */}
       <div className="space-y-1">
@@ -187,6 +260,3 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
     </form>
   )
 }
-
-// useState needed in this file
-import { useState } from 'react'

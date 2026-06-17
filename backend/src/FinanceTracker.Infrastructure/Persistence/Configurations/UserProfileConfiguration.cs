@@ -29,5 +29,14 @@ internal sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserPr
 
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.UpdatedAt).IsRequired();
+
+        // Optimistic locking for this editable entity (CLAUDE.md, ARCHITECTURE.md §4):
+        // use the PostgreSQL xmin system column as the concurrency token. No column
+        // is added to the table — xmin already exists on every row.
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .HasColumnName("xmin")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }

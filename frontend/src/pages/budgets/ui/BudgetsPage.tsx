@@ -8,10 +8,11 @@ import {
   type BudgetProgress,
 } from '@/entities/budget'
 import { BudgetForm, type BudgetFormValues } from '@/features/budget-form'
+import { useBaseCurrency } from '@/entities/profile'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/skeleton'
 import { LucideIcon } from '@/shared/ui/lucide-icon'
-import { formatRub, formatMonthLong } from '@/shared/lib/format'
+import { formatMoney, formatMonthLong } from '@/shared/lib/format'
 
 type Editing = 'new' | BudgetProgress | null
 
@@ -28,6 +29,7 @@ function barColor(pct: number): string {
 
 export function BudgetsPage() {
   const { data: budgets, isPending } = useBudgetProgress(CURRENT_YEAR, CURRENT_MONTH)
+  const base = useBaseCurrency()
   const createMutation = useCreateBudget()
   const updateMutation = useUpdateBudget()
   const deleteMutation = useDeleteBudget()
@@ -172,13 +174,13 @@ export function BudgetsPage() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className={over ? 'font-medium text-destructive' : 'text-muted-foreground'}>
-                      {formatRub(b.spentAmount)} из {formatRub(b.limitAmount)}
+                      {formatMoney(b.spentAmount, base)} из {formatMoney(b.limitAmount, base)}
                     </span>
                     <span className={over ? 'font-medium text-destructive' : 'text-muted-foreground'}>
                       {b.percentage.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%
                       {over
-                        ? ` · превышение на ${formatRub(-b.remainingAmount)}`
-                        : ` · осталось ${formatRub(b.remainingAmount)}`}
+                        ? ` · превышение на ${formatMoney(-b.remainingAmount, base)}`
+                        : ` · осталось ${formatMoney(b.remainingAmount, base)}`}
                     </span>
                   </div>
                 </div>

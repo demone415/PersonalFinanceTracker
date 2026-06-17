@@ -150,9 +150,10 @@ public sealed class BudgetService(
         var to = from.AddMonths(1);
         var categoryIds = budgets.Select(b => b.CategoryId).ToList();
 
-        // Amounts are aggregated as stored, i.e. in the user's base currency —
-        // the same contract DashboardService relies on (Accrual.Currency /
-        // ExchangeRate carry the original transaction values for reference only).
+        // Spend is converted to the base currency via each accrual's captured
+        // rate (Epic 8, T8.1.4 — mirrors Accrual.AmountInBaseCurrency; a null
+        // rate is 1:1). The same contract DashboardService applies, so figures
+        // stay consistent. Budget limits are taken to be in the base currency.
         var spentByCategory = await db.Accruals
             .Where(a => a.UserId == userId
                         && a.IncludeInStats
@@ -163,7 +164,7 @@ public sealed class BudgetService(
             .Select(g => new
             {
                 CategoryId = g.Key,
-                Spent = g.Sum(x => x.Type == AccrualType.ReturnExpense ? -x.Amount : x.Amount),
+                Spent = g.Sum(x => (x.Type == AccrualType.ReturnExpense ? -x.Amount : x.Amount) * (x.ExchangeRate ?? 1m)),
             })
             .ToDictionaryAsync(x => x.CategoryId, x => x.Spent, cancellationToken);
 

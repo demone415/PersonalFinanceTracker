@@ -17,6 +17,9 @@ internal sealed class AccrualConfiguration : IEntityTypeConfiguration<Accrual>
         builder.Property(a => a.Type).IsRequired();
         builder.Property(a => a.Currency).IsRequired().HasMaxLength(3);
         builder.Property(a => a.ExchangeRate).HasPrecision(18, 6);
+
+        // Computed in C# from Amount × ExchangeRate; never a column (Epic 8).
+        builder.Ignore(a => a.AmountInBaseCurrency);
         builder.Property(a => a.Description).HasMaxLength(500);
         builder.Property(a => a.IncludeInStats).IsRequired();
         builder.Property(a => a.CreatedAt).IsRequired();

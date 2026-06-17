@@ -23,6 +23,16 @@ public class Accrual : IUserOwnedEntity
     public Category? Category { get; private set; }
     public Receipt? Receipt { get; private set; }
 
+    /// <summary>
+    /// Amount expressed in the user's base currency (Epic 8, T8.1.4). The
+    /// <see cref="ExchangeRate"/> captured at transaction time is the multiplier
+    /// from <see cref="Currency"/> to the base currency; a <c>null</c> rate means
+    /// the transaction is already in the base currency (1:1). This is the
+    /// canonical conversion rule every aggregate uses — see the "Currency
+    /// aggregation contract" in CLAUDE.md. (Not mapped; ignored in EF config.)
+    /// </summary>
+    public decimal AmountInBaseCurrency => ExchangeRate.HasValue ? Amount * ExchangeRate.Value : Amount;
+
     private readonly List<AccrualTag> _tags = [];
     public IReadOnlyCollection<AccrualTag> Tags => _tags;
 

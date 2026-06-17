@@ -1,11 +1,13 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useExpensesByCategory, type PeriodParams } from '@/entities/dashboard'
-import { formatRub } from '@/shared/lib/format'
+import { useBaseCurrency } from '@/entities/profile'
+import { formatMoney } from '@/shared/lib/format'
 import { ChartCard } from './ChartCard'
 
 /** Expenses-by-category donut for the selected month (T2.2.2). */
 export function ExpensesPieChart({ period }: { period?: PeriodParams }) {
   const { data, isPending, isError } = useExpensesByCategory(period)
+  const base = useBaseCurrency()
   const items = data ?? []
   const total = items.reduce((sum, i) => sum + i.amount, 0)
 
@@ -35,12 +37,12 @@ export function ExpensesPieChart({ period }: { period?: PeriodParams }) {
                   <Cell key={item.categoryId ?? 'none'} fill={item.color} />
                 ))}
               </Pie>
-              <Tooltip content={<PieTooltip />} />
+              <Tooltip content={<PieTooltip currency={base} />} />
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-xs text-muted-foreground">Всего</span>
-            <span className="text-base font-semibold tabular-nums">{formatRub(total)}</span>
+            <span className="text-base font-semibold tabular-nums">{formatMoney(total, base)}</span>
           </div>
         </div>
 
@@ -59,7 +61,7 @@ export function ExpensesPieChart({ period }: { period?: PeriodParams }) {
                 {item.percentage.toLocaleString('ru-RU')}%
               </span>
               <span className="w-20 shrink-0 text-right tabular-nums">
-                {formatRub(item.amount)}
+                {formatMoney(item.amount, base)}
               </span>
             </li>
           ))}
@@ -73,14 +75,16 @@ interface TooltipPayload {
   payload: { categoryName: string; amount: number; percentage: number }
 }
 
-function PieTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) {
+function PieTooltip({
+  active, payload, currency = 'RUB',
+}: { active?: boolean; payload?: TooltipPayload[]; currency?: string }) {
   if (!active || !payload?.length) return null
   const { categoryName, amount, percentage } = payload[0].payload
   return (
     <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
       <p className="font-medium">{categoryName}</p>
       <p className="tabular-nums text-muted-foreground">
-        {formatRub(amount)} · {percentage.toLocaleString('ru-RU')}%
+        {formatMoney(amount, currency)} · {percentage.toLocaleString('ru-RU')}%
       </p>
     </div>
   )

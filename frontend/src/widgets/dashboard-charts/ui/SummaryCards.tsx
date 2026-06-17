@@ -1,18 +1,21 @@
 import { TrendingUp, TrendingDown, Wallet, Scale } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useDashboardSummary, type PeriodParams } from '@/entities/dashboard'
+import { useBaseCurrency } from '@/entities/profile'
 import { Skeleton } from '@/shared/ui/skeleton'
-import { formatRub } from '@/shared/lib/format'
+import { formatMoney } from '@/shared/lib/format'
 
 /** Headline metric cards: income, expense, month balance, all-time balance (T2.2.5). */
 export function SummaryCards({ period }: { period?: PeriodParams }) {
   const { data, isPending, isError } = useDashboardSummary(period)
+  // Aggregates arrive already converted to the base currency (Epic 8); label them so.
+  const base = useBaseCurrency()
 
   return (
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <MetricCard
         label="Доходы за месяц"
-        value={data ? formatRub(data.monthIncome) : undefined}
+        value={data ? formatMoney(data.monthIncome, base) : undefined}
         icon={TrendingUp}
         tone="text-green-500"
         loading={isPending}
@@ -20,7 +23,7 @@ export function SummaryCards({ period }: { period?: PeriodParams }) {
       />
       <MetricCard
         label="Расходы за месяц"
-        value={data ? formatRub(data.monthExpense) : undefined}
+        value={data ? formatMoney(data.monthExpense, base) : undefined}
         icon={TrendingDown}
         tone="text-red-500"
         loading={isPending}
@@ -28,7 +31,7 @@ export function SummaryCards({ period }: { period?: PeriodParams }) {
       />
       <MetricCard
         label="Баланс за месяц"
-        value={data ? formatRub(data.monthBalance) : undefined}
+        value={data ? formatMoney(data.monthBalance, base) : undefined}
         icon={Scale}
         tone={data && data.monthBalance < 0 ? 'text-red-500' : 'text-green-500'}
         loading={isPending}
@@ -36,7 +39,7 @@ export function SummaryCards({ period }: { period?: PeriodParams }) {
       />
       <MetricCard
         label="Баланс (всего)"
-        value={data ? formatRub(data.totalBalance) : undefined}
+        value={data ? formatMoney(data.totalBalance, base) : undefined}
         icon={Wallet}
         tone={data && data.totalBalance < 0 ? 'text-red-500' : 'text-foreground'}
         loading={isPending}
