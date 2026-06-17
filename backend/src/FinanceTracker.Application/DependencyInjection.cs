@@ -3,6 +3,8 @@ using FinanceTracker.Application.Features.Budgets;
 using FinanceTracker.Application.Features.Categories;
 using FinanceTracker.Application.Features.ChangeLog;
 using FinanceTracker.Application.Features.Dashboard;
+using FinanceTracker.Application.Features.Export;
+using FinanceTracker.Application.Features.Jobs;
 using FinanceTracker.Application.Features.Profile;
 using FinanceTracker.Application.Features.Receipts;
 using FluentValidation;
@@ -29,6 +31,13 @@ public static class DependencyInjection
         // processor that turns a provider outcome into a receipt state transition.
         services.AddScoped<ReceiptScanService>();
         services.AddScoped<ReceiptFetchProcessor>();
+
+        // Async CSV export (Story 6.2): the enqueue producer, the off-request
+        // processor, the read-side job service, and the RFC-4180 CSV writer.
+        services.AddScoped<AccrualExportService>();
+        services.AddScoped<AccrualExportProcessor>();
+        services.AddScoped<BackgroundTaskService>();
+        services.AddSingleton<IAccrualCsvExporter, CsvAccrualExporter>();
 
         // System clock — overridden with a fake in unit tests for deterministic retries.
         services.TryAddSingleton(TimeProvider.System);

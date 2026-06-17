@@ -37,6 +37,17 @@ export function useReceipt(accrualId: string) {
   })
 }
 
+/**
+ * Starts an async CSV export of the accruals matching `filter` (T6.2.1) and
+ * returns the job id. Orchestration (polling + download) lives in the
+ * accrual-export feature.
+ */
+export function useExportAccruals() {
+  return useMutation({
+    mutationFn: (filter: AccrualFilter) => accrualApi.exportCsv(filter),
+  })
+}
+
 /** Submit a scanned QR string (T4.3.2). Refreshes lists so the new accrual appears. */
 export function useScanQr() {
   const qc = useQueryClient()

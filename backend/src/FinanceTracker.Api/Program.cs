@@ -51,7 +51,10 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy => policy
         .WithOrigins(corsOrigins)
         .AllowAnyHeader()
-        .AllowAnyMethod()));
+        .AllowAnyMethod()
+        // Let the SPA read the download filename of streamed job results
+        // (GET /jobs/{id}/result) cross-origin in dev.
+        .WithExposedHeaders("Content-Disposition")));
 
 // FluentValidation runs via a global action filter (see ValidationFilter).
 // Idempotency-Key deduplication runs via IdempotencyFilter (ARCHITECTURE.md §4).

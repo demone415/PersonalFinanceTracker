@@ -1,5 +1,6 @@
 using FinanceTracker.Api.RateLimiting;
 using FinanceTracker.Application.Features.Accruals;
+using FinanceTracker.Application.Features.Export;
 using FinanceTracker.Application.Features.Receipts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -53,6 +54,24 @@ public sealed class AccrualsController : ControllerBase
     {
         await service.DeleteAsync(id, cancellationToken);
         return NoContent();
+    }
+
+    // ── Async CSV export (Story 6.2 / T6.2.1) ────────────────────────────────
+
+    /// <summary>
+    /// Queues an async CSV export of the caller's accruals matching the given
+    /// filters (the same filters as the list, minus pagination). Returns 202 with
+    /// the job id; poll <c>GET /api/v1/jobs/{id}</c> and download via
+    /// <c>GET /api/v1/jobs/{id}/result</c> once it is Done.
+    /// </summary>
+    [HttpPost("export")]
+    public async Task<ActionResult<ExportJobResponse>> Export(
+        [FromQuery] AccrualExportFilter filter,
+        [FromServices] AccrualExportService service,
+        CancellationToken cancellationToken)
+    {
+        var response = await service.CreateExportAsync(filter, cancellationToken);
+        return Accepted($"/api/v1/jobs/{response.JobId}", response);
     }
 
     // ── QR scan → background receipt fetch (Story 4.2 / T4.3.2) ───────────────

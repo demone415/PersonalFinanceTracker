@@ -1,4 +1,5 @@
 using FinanceTracker.Application.Common.Interfaces;
+using FinanceTracker.Application.Features.Export;
 using FinanceTracker.Application.Features.Receipts;
 using FinanceTracker.Infrastructure.Messaging;
 using Hangfire;
@@ -34,12 +35,25 @@ public static class BackgroundProcessingServiceCollectionExtensions
         // never parallel (ARCHITECTURE.md §4 / T4.2.2). No dashboard is exposed.
         services.AddHangfireServer(options =>
         {
+            options.ServerName = "receipts";
             options.Queues = [ReceiptQueues.Hangfire];
             options.WorkerCount = 1;
         });
 
+        // A separate server for async import/export (Story 6.2): kept off the
+        // single-worker receipts queue so a long CSV export never blocks receipt
+        // fetching, and exports may run a few at a time.
+        services.AddHangfireServer(options =>
+        {
+            options.ServerName = "exports";
+            options.Queues = [ExportQueues.Exports];
+            options.WorkerCount = 2;
+        });
+
         services.AddScoped<ReceiptFetchJob>();
         services.AddScoped<ReceiptDispatchJob>();
+        services.AddScoped<AccrualExportJob>();
+        services.AddScoped<IAccrualExportScheduler, HangfireAccrualExportScheduler>();
 
         // Wolverine/Hangfire-backed implementations of the Application abstractions.
         services.AddScoped<IReceiptFetchScheduler, HangfireReceiptFetchScheduler>();
