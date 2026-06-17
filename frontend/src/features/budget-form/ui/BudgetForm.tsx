@@ -1,14 +1,18 @@
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCategories } from '@/entities/category'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui/select'
 import { formatMonthLong } from '@/shared/lib/format'
 import { budgetSchema, type BudgetFormValues } from '../model/budget-schema'
-
-const SELECT_CLASS =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-60'
 
 interface Props {
   /** In edit mode only the limit/currency are editable; category and period are fixed. */
@@ -36,6 +40,7 @@ export function BudgetForm({
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<BudgetFormValues>({
@@ -56,14 +61,24 @@ export function BudgetForm({
       {/* Category */}
       <div className="space-y-1">
         <Label>Категория *</Label>
-        <select className={SELECT_CLASS} disabled={isEdit} {...register('categoryId')}>
-          <option value="">— выберите —</option>
-          {categories?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <Controller
+          control={control}
+          name="categoryId"
+          render={({ field }) => (
+            <Select value={field.value || undefined} onValueChange={field.onChange} disabled={isEdit}>
+              <SelectTrigger>
+                <SelectValue placeholder="— выберите —" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
         {errors.categoryId && (
           <p className="text-xs text-destructive">{errors.categoryId.message}</p>
         )}
@@ -73,25 +88,55 @@ export function BudgetForm({
         {/* Month */}
         <div className="space-y-1">
           <Label>Месяц *</Label>
-          <select className={SELECT_CLASS} disabled={isEdit} {...register('month', { valueAsNumber: true })}>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {formatMonthLong(now.getFullYear(), m).split(' ')[0]}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="month"
+            render={({ field }) => (
+              <Select
+                value={String(field.value)}
+                onValueChange={(v) => field.onChange(Number(v))}
+                disabled={isEdit}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <SelectItem key={m} value={String(m)}>
+                      {formatMonthLong(now.getFullYear(), m).split(' ')[0]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
 
         {/* Year */}
         <div className="space-y-1">
           <Label>Год *</Label>
-          <select className={SELECT_CLASS} disabled={isEdit} {...register('year', { valueAsNumber: true })}>
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="year"
+            render={({ field }) => (
+              <Select
+                value={String(field.value)}
+                onValueChange={(v) => field.onChange(Number(v))}
+                disabled={isEdit}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
       </div>
 

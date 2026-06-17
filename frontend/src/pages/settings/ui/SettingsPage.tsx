@@ -4,21 +4,15 @@ import { useProfile, useUpdateProfile, type Profile } from '@/entities/profile'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui/select'
 import { Skeleton } from '@/shared/ui/skeleton'
-
-/** Common base currencies offered in the selector; any 3-letter code also works. */
-const CURRENCIES: Array<{ code: string; label: string }> = [
-  { code: 'RUB', label: 'Российский рубль (₽)' },
-  { code: 'USD', label: 'Доллар США ($)' },
-  { code: 'EUR', label: 'Евро (€)' },
-  { code: 'GBP', label: 'Фунт стерлингов (£)' },
-  { code: 'CNY', label: 'Юань (¥)' },
-  { code: 'KZT', label: 'Тенге (₸)' },
-  { code: 'TRY', label: 'Турецкая лира (₺)' },
-  { code: 'GEL', label: 'Грузинский лари (₾)' },
-  { code: 'AMD', label: 'Армянский драм (֏)' },
-  { code: 'AED', label: 'Дирхам ОАЭ' },
-]
+import { CURRENCIES } from '@/shared/lib/currencies'
 
 export function SettingsPage() {
   const { data: profile, isPending } = useProfile()
@@ -76,19 +70,22 @@ function ProfileForm({ profile }: { profile: Profile }) {
 
       <div className="space-y-1">
         <Label htmlFor="currency">Основная валюта</Label>
-        <select
-          id="currency"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+        <Select
           value={currency}
-          onChange={(e) => { setCurrency(e.target.value); setSaved(false) }}
+          onValueChange={(v) => { setCurrency(v); setSaved(false) }}
         >
-          {!hasPreset && <option value={currency}>{currency}</option>}
-          {CURRENCIES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id="currency">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {!hasPreset && <SelectItem value={currency}>{currency}</SelectItem>}
+            {CURRENCIES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>
+                {c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <p className="text-xs text-muted-foreground">
           В этой валюте показываются дашборд и прогресс бюджетов. Суммы операций в
           других валютах пересчитываются по курсу, указанному при вводе.

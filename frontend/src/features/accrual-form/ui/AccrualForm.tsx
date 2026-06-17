@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCategories } from '@/entities/category'
 import { useBaseCurrency } from '@/entities/profile'
 import { Button } from '@/shared/ui/button'
+import { DateTimePicker } from '@/shared/ui/datetime-picker'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui/select'
 import { formatMoney } from '@/shared/lib/format'
+import { CURRENCIES } from '@/shared/lib/currencies'
 import { accrualSchema, type AccrualFormValues } from '../model/accrual-schema'
+
+/** Sentinel for the "no category" option — Radix Select forbids an empty value. */
+const NO_CATEGORY = '__none__'
 
 const ACCRUAL_TYPES = [
   { value: 'Expense', label: 'Расход' },
@@ -31,6 +43,7 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
@@ -116,7 +129,13 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
         {/* Date */}
         <div className="space-y-1">
           <Label>Дата *</Label>
-          <Input type="datetime-local" {...register('date')} />
+          <Controller
+            control={control}
+            name="date"
+            render={({ field }) => (
+              <DateTimePicker value={field.value ?? ''} onChange={field.onChange} />
+            )}
+          />
           {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
         </div>
       </div>
@@ -125,23 +144,53 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
         {/* Type */}
         <div className="space-y-1">
           <Label>Тип *</Label>
-          <select
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-            {...register('type')}
-          >
-            {ACCRUAL_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="type"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCRUAL_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
           {errors.type && <p className="text-xs text-destructive">{errors.type.message}</p>}
         </div>
 
         {/* Currency */}
         <div className="space-y-1">
           <Label>Валюта *</Label>
-          <Input placeholder="RUB" maxLength={3} {...register('currency')} />
+          <Controller
+            control={control}
+            name="currency"
+            render={({ field }) => {
+              const code = (field.value ?? '').toUpperCase()
+              const hasPreset = CURRENCIES.some((c) => c.code === code)
+              return (
+                <Select value={code || undefined} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Валюта" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!hasPreset && code && <SelectItem value={code}>{code}</SelectItem>}
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            }}
+          />
           {errors.currency && <p className="text-xs text-destructive">{errors.currency.message}</p>}
         </div>
       </div>
@@ -181,17 +230,28 @@ export function AccrualForm({ defaultValues, submitting, submitLabel, onSubmit, 
       {/* Category */}
       <div className="space-y-1">
         <Label>Категория</Label>
-        <select
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          {...register('categoryId')}
-        >
-          <option value="">— без категории —</option>
-          {categories?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <Controller
+          control={control}
+          name="categoryId"
+          render={({ field }) => (
+            <Select
+              value={field.value || NO_CATEGORY}
+              onValueChange={(v) => field.onChange(v === NO_CATEGORY ? '' : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="— без категории —" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CATEGORY}>— без категории —</SelectItem>
+                {categories?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
 
       {/* Description */}

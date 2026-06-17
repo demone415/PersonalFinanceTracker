@@ -2,9 +2,20 @@ import { useState } from 'react'
 import type { AccrualFilter, AccrualType } from '@/entities/accrual'
 import { useCategories } from '@/entities/category'
 import { Button } from '@/shared/ui/button'
+import { DatePicker } from '@/shared/ui/date-picker'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui/select'
 import { countActiveFilters } from '../lib/filter-url'
+
+/** Sentinel for the "any" option — Radix Select forbids an empty-string value. */
+const ANY = '__any__'
 
 const TYPE_OPTIONS: { value: AccrualType; label: string }[] = [
   { value: 'Expense', label: 'Расход' },
@@ -12,9 +23,6 @@ const TYPE_OPTIONS: { value: AccrualType; label: string }[] = [
   { value: 'ReturnExpense', label: 'Возврат расхода' },
   { value: 'ReturnIncome', label: 'Возврат дохода' },
 ]
-
-const SELECT_CLASS =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm'
 
 /** Mutable, non-pagination fields the panel edits as a local draft. */
 type Draft = {
@@ -115,18 +123,18 @@ export function FilterPanel({ filter, onApply }: Props) {
             {/* Date range */}
             <div className="space-y-1">
               <Label>Дата с</Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={draft.dateFrom}
-                onChange={(e) => update('dateFrom', e.target.value)}
+                onChange={(v) => update('dateFrom', v)}
+                placeholder="dd.mm.yyyy"
               />
             </div>
             <div className="space-y-1">
               <Label>Дата по</Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={draft.dateTo}
-                onChange={(e) => update('dateTo', e.target.value)}
+                onChange={(v) => update('dateTo', v)}
+                placeholder="dd.mm.yyyy"
               />
             </div>
 
@@ -157,35 +165,43 @@ export function FilterPanel({ filter, onApply }: Props) {
             {/* Category */}
             <div className="space-y-1">
               <Label>Категория</Label>
-              <select
-                className={SELECT_CLASS}
-                value={draft.categoryId}
-                onChange={(e) => update('categoryId', e.target.value)}
+              <Select
+                value={draft.categoryId || ANY}
+                onValueChange={(v) => update('categoryId', v === ANY ? '' : v)}
               >
-                <option value="">— любая —</option>
-                {categories?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="— любая —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>— любая —</SelectItem>
+                  {categories?.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Type */}
             <div className="space-y-1">
               <Label>Тип</Label>
-              <select
-                className={SELECT_CLASS}
-                value={draft.type}
-                onChange={(e) => update('type', e.target.value)}
+              <Select
+                value={draft.type || ANY}
+                onValueChange={(v) => update('type', v === ANY ? '' : v)}
               >
-                <option value="">— любой —</option>
-                {TYPE_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="— любой —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>— любой —</SelectItem>
+                  {TYPE_OPTIONS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
