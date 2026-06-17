@@ -727,3 +727,7 @@ Service FinanceTracker.Application.Common.Interfaces.IReceiptFetchScheduler: Con
 
 ---
 
+Закомить и запуш изменения
+
+---
+
