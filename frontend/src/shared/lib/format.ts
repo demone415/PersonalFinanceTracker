@@ -48,6 +48,20 @@ export function formatMoneyCompact(value: number, currency = 'RUB'): string {
   }
 }
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** Russian date-time, `dd.MM.yyyy HH:mm:ss` (e.g. `28.06.2026 03:00:00`). */
+export function formatDateTimeRu(value: string | number | Date): string {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+/** Local `YYYY-MM-DDTHH:mm:ss` string (no UTC shift) for datetime form values. */
+export function toLocalDateTimeString(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
 /** Short month label, e.g. `июн` (or `июн 25` when crossing a year boundary). */
 export function formatMonthShort(year: number, month: number, withYear = false): string {
   const name = MONTHS_SHORT[month - 1] ?? ''

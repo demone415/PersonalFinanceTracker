@@ -4,6 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Render native controls (select dropdowns, date picker, calendar icon,
+     scrollbars) to match the active theme — overridden to dark in .dark. */
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -39,6 +42,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -117,4 +121,48 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* react-day-picker theming — bind the picker to the app's design tokens so it
+   follows light/dark. The compound `.rdp-root.rdp-themed` selector (the root div
+   carries both classes) raises specificity above the library's own `.rdp-root`
+   defaults, which are otherwise bundled after this file and would win on order. */
+.rdp-root.rdp-themed {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--accent);
+  --rdp-today-color: var(--primary);
+  --rdp-day-width: 38px;
+  --rdp-day-height: 38px;
+  --rdp-day_button-width: 36px;
+  --rdp-day_button-height: 36px;
+  --rdp-nav_button-width: 2rem;
+  --rdp-nav_button-height: 2rem;
+  margin: 0;
+}
+
+.rdp-themed .rdp-day_button:hover {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.rdp-themed .rdp-day_button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* Today: clearer than the default tinted text — outline ring, normal colour. */
+.rdp-themed .rdp-today:not(.rdp-selected) .rdp-day_button {
+  border-color: var(--ring);
+  color: var(--foreground);
+}
+
+/* Selected day: filled with the primary colour rather than just an outline. */
+.rdp-themed .rdp-selected .rdp-day_button {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+.rdp-themed .rdp-chevron {
+  fill: var(--foreground);
 }
