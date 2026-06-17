@@ -33,6 +33,13 @@ public class Accrual : IUserOwnedEntity
     /// </summary>
     public decimal AmountInBaseCurrency => ExchangeRate.HasValue ? Amount * ExchangeRate.Value : Amount;
 
+    /// <summary>
+    /// Placeholder description stamped on a freshly QR-scanned accrual while its
+    /// receipt is still being fetched in the background. Replaced with the merchant
+    /// name once the fetch succeeds (see <see cref="ApplyFetchedReceipt"/>).
+    /// </summary>
+    public const string PendingReceiptDescription = "Чек (ожидает загрузки)";
+
     private readonly List<AccrualTag> _tags = [];
     public IReadOnlyCollection<AccrualTag> Tags => _tags;
 
@@ -87,6 +94,23 @@ public class Accrual : IUserOwnedEntity
     }
 
     public void SetReceipt(Guid receiptId) => ReceiptId = receiptId;
+
+    /// <summary>
+    /// Refreshes a QR-scanned accrual once its receipt has been fetched: swaps the
+    /// "loading" placeholder description for the merchant name and syncs the amount
+    /// to the fiscal total. No-op once the user has edited the accrual (the
+    /// description no longer matches <see cref="PendingReceiptDescription"/>) so we
+    /// never clobber their changes.
+    /// </summary>
+    public void ApplyFetchedReceipt(string? organization, decimal amount)
+    {
+        if (Description != PendingReceiptDescription)
+            return;
+
+        Description = string.IsNullOrWhiteSpace(organization) ? "Чек" : organization.Trim();
+        if (amount > 0)
+            Amount = amount;
+    }
 
     public void SetTags(IEnumerable<string> tags)
     {

@@ -61,9 +61,21 @@ public class ReceiptFetchProcessorTests
             var receipt = Receipt.CreateForQrScan(
                 UserId, 34_993, Now, "t=20200924T1837&s=349.93&fn=1&i=2&fp=3&n=1");
             Db.Receipts.Add(receipt);
+
+            // Mirror the scan flow: a Pending accrual linked to the receipt, carrying
+            // the "loading" placeholder description until the fetch completes.
+            var accrual = new Accrual(
+                UserId, 349.93m, Now, AccrualType.Expense,
+                description: Accrual.PendingReceiptDescription);
+            accrual.SetReceipt(receipt.Id);
+            Db.Accruals.Add(accrual);
+
             Db.SaveChanges();
             return receipt;
         }
+
+        public Accrual ReloadAccrualByReceipt(Guid receiptId) =>
+            Db.Accruals.IgnoreQueryFilters().AsNoTracking().Single(a => a.ReceiptId == receiptId);
 
         public void AllowQuota() =>
             RateLimiter.Setup(r => r.TryAcquireAsync(UserId, It.IsAny<CancellationToken>()))
@@ -96,6 +108,12 @@ public class ReceiptFetchProcessorTests
         Assert.Equal("Org", saved.Organization);
         Assert.Equal(1, saved.FetchAttempts);
         h.DeadLetters.Verify(d => d.SendAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        // The linked accrual's "loading" placeholder is replaced with the merchant
+        // name and its amount synced to the fiscal total (34_993 kopecks).
+        var accrual = h.ReloadAccrualByReceipt(receipt.Id);
+        Assert.Equal("Org", accrual.Description);
+        Assert.Equal(349.93m, accrual.Amount);
     }
 
     [Fact]

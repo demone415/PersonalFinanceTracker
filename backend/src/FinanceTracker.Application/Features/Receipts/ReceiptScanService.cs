@@ -52,7 +52,7 @@ public sealed class ReceiptScanService(
             qr.Sum,
             qr.Timestamp,
             qr.AccrualType ?? AccrualType.Expense,
-            description: "Чек (ожидает загрузки)");
+            description: Accrual.PendingReceiptDescription);
         accrual.SetReceipt(receipt.Id);
 
         db.Receipts.Add(receipt);

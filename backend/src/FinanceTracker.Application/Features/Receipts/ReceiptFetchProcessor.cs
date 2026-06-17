@@ -154,6 +154,7 @@ public sealed class ReceiptFetchProcessor(
         {
             case ReceiptFetchOutcome.Success when result.Data is not null:
                 ReceiptMapper.Apply(receipt, result.Data, result.RawJson);
+                await RefreshLinkedAccrualAsync(receipt, cancellationToken);
                 await unitOfWork.SaveChangesAsync(cancellationToken);
                 logger.LogInformation("Receipt {ReceiptId} fetched on attempt {Attempt}.",
                     receiptId, receipt.FetchAttempts);
@@ -174,6 +175,23 @@ public sealed class ReceiptFetchProcessor(
                 return await RescheduleOrDeadLetterAsync(
                     receipt, $"transient provider outcome ({result.Outcome})", cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Updates the accrual created for this QR scan once the receipt is fetched, so
+    /// the "Чек (ожидает загрузки)" placeholder gives way to the merchant name and
+    /// fiscal total on the accrual list/detail views. Background work has no HTTP
+    /// user, so the data-isolation filter is bypassed; the accrual is reached via its
+    /// receipt link. Skipped silently when no accrual references this receipt (e.g.
+    /// a manually-entered receipt).
+    /// </summary>
+    private async Task RefreshLinkedAccrualAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        var accrual = await db.Accruals
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.ReceiptId == receipt.Id, cancellationToken);
+
+        accrual?.ApplyFetchedReceipt(receipt.Organization, receipt.AmountInKopecks / 100m);
     }
 
     /// <summary>Schedules the next attempt per the retry scheme, or dead-letters when exhausted.</summary>

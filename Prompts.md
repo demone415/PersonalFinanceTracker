@@ -563,3 +563,98 @@ fix `Medium — cache invalidation can fail a successful write`
 
 ---
 
+Отправил фото чека в сервис. Он завис в статусе `Pending`. В логах нашел вот такую ошибку:
+
+```
+[14:15:09 ERR] Exception detected: {"SourceContext": "Wolverine.Runtime.WolverineRuntime"}
+
+Wolverine.Configuration.InvalidServiceLocationException: Found service locations while generating code for Message Handler for FinanceTracker.Application.Features.Receipts.ReceiptFetchRequested, but ServiceLocationPolicy.NotAllowed is in effect (this will become the default in Wolverine 6.0).
+
+See https://wolverinefx.net/guide/codegen.html for more information
+
+Service location(s):
+
+Service FinanceTracker.Application.Common.Interfaces.IReceiptFetchScheduler: Concrete type FinanceTracker.Infrastructure.BackgroundJobs.HangfireReceiptFetchScheduler is not public, so requires service location
+
+
+   at Wolverine.Configuration.Chain`2.AssertServiceLocationsAreAllowed(ServiceLocationReport[] reports, IServiceProvider services) in /home/runner/work/wolverine/wolverine/src/Wolverine/Configuration/Chain.cs:line 532
+
+   at JasperFx.CodeGeneration.DynamicTypeLoader.Initialize(ICodeFile file, GenerationRules rules, ICodeFileCollection parent, IServiceProvider services) in /_/src/JasperFx/CodeGeneration/DynamicTypeLoader.cs:line 53
+
+   at JasperFx.CodeGeneration.CodeFileExtensions.InitializeSynchronously(ICodeFile file, GenerationRules rules, ICodeFileCollection parent, IServiceProvider services) in /_/src/JasperFx/CodeGeneration/CodeFileExtensions.cs:line 49
+
+   at Wolverine.Runtime.Handlers.HandlerGraph.resolveHandlerFromChain(Type messageType, HandlerChain chain, Boolean shouldCacheGlobally) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/Handlers/HandlerGraph.cs:line 279
+
+   at Wolverine.Runtime.Handlers.HandlerGraph.HandlerFor(Type messageType) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/Handlers/HandlerGraph.cs:line 235
+
+   at Wolverine.Runtime.Handlers.HandlerGraph.HandlerFor(Type messageType, Endpoint endpoint) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/Handlers/HandlerGraph.cs:line 176
+
+   at Wolverine.Runtime.WolverineRuntime.Wolverine.Runtime.IExecutorFactory.BuildFor(Type messageType, Endpoint endpoint) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/Wolverine.ExecutorFactory.cs:line 38
+
+   at Wolverine.Runtime.HandlerPipeline.<>c__DisplayClass7_0.<.ctor>b__0(Type type) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/HandlerPipeline.cs:line 50
+
+   at JasperFx.Core.LightweightCache`2.get_Item(TKey key) in /_/src/JasperFx/Core/LightweightCache.cs:line 58
+
+   at Wolverine.Runtime.HandlerPipeline.executeAsync(MessageContext context, Envelope envelope, Activity activity) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/HandlerPipeline.cs:line 334
+
+   at Wolverine.Runtime.HandlerPipeline.InvokeAsync(Envelope envelope, IChannelCallback channel, Activity activity) in /home/runner/work/wolverine/wolverine/src/Wolverine/Runtime/HandlerPipeline.cs:line 88
+```
+
+---
+
+Комить в мейн сразу и пуш
+
+---
+
+Теперь ошибка такая 
+
+```
+   at System.Text.Json.Serialization.JsonConverter`1.TryRead(Utf8JsonReader& reader, Type typeToConvert, JsonSerializerOptions options, ReadStack& state, T& value, Boolean& isPopulatedValue)
+
+   at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader& reader, T& value, JsonSerializerOptions options, ReadStack& state)
+
+   --- End of inner exception stack trace ---
+
+   at System.Text.Json.ThrowHelper.ReThrowWithPath(ReadStack& state, Utf8JsonReader& reader, Exception ex)
+
+   at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader& reader, T& value, JsonSerializerOptions options, ReadStack& state)
+
+   at System.Text.Json.Serialization.Metadata.JsonTypeInfo`1.ContinueDeserialize[TReadBufferState,TStream](TReadBufferState& bufferState, JsonReaderState& jsonReaderState, ReadStack& readStack, T& value)
+
+   at System.Text.Json.Serialization.Metadata.JsonTypeInfo`1.DeserializeAsync[TReadBufferState,TStream](TStream utf8Json, TReadBufferState bufferState, CancellationToken cancellationToken)
+
+   at System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsyncCore[T](HttpContent content, JsonSerializerOptions options, CancellationToken cancellationToken)
+
+   at Refit.SystemTextJsonContentSerializer.FromHttpContentAsync[T](HttpContent content, CancellationToken cancellationToken) in /_/Refit/SystemTextJsonContentSerializer.cs:line 51
+
+   at Refit.RequestBuilderImplementation.DeserializeContentAsync[T](HttpResponseMessage resp, HttpContent content, CancellationToken cancellationToken) in /_/Refit/RequestBuilderImplementation.cs:line 529
+
+   at Refit.RequestBuilderImplementation.<>c__DisplayClass18_0`2.<<BuildCancellableTaskFuncForMethod>b__0>d.MoveNext() in /_/Refit/RequestBuilderImplementation.cs:line 454
+
+   --- End of inner exception stack trace ---
+
+   at Refit.RequestBuilderImplementation.<>c__DisplayClass18_0`2.<<BuildCancellableTaskFuncForMethod>b__0>d.MoveNext() in /_/Refit/RequestBuilderImplementation.cs:line 468
+
+--- End of stack trace from previous location ---
+
+   at Refit.Implementation.Generated.FinanceTrackerInfrastructureExternalProvidersProverkaCheckaIProverkaCheckaApi.GetCheckAsync(IDictionary`2 form, CancellationToken ct) in /src/src/FinanceTracker.Infrastructure/obj/Release/net10.0/InterfaceStubGeneratorV3/Refit.Generator.InterfaceStubGeneratorV2/IProverkaCheckaApi.g.cs:line 38
+
+   at FinanceTracker.Infrastructure.ExternalProviders.ProverkaChecka.ProverkaCheckaProvider.GetReceiptAsync(String qrRaw, CancellationToken ct) in /src/src/FinanceTracker.Infrastructure/ExternalProviders/ProverkaChecka/ProverkaCheckaProvider.cs:line 38
+
+   at FinanceTracker.Application.Features.Receipts.ReceiptFetchProcessor.ProcessAsync(Guid receiptId, CancellationToken cancellationToken) in /src/src/FinanceTracker.Application/Features/Receipts/ReceiptFetchProcessor.cs:line 125
+```
+
+---
+
+Начисления, полученные через провайдера, остаются в статусе "Чек (ожидает загрузки)" на странице самого начисления и на странице с фильтрами
+
+---
+
+На странице с фильтрами кнопка "Применить" нажимается всего один раз.  Сделай так, чтобы на нее можно было нажимать, даже если фильтр уже применен. То есть она должна еще раз применять фильтр
+
+---
+
+Комить в main и пуш
+
+---
+
