@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
 import { Camera, CameraOff, ImageUp, Loader2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { decodeQrFromImageFile, decodeQrFromVideoFrame } from '../lib/decode-qr'
+
+/** How often the live-camera loop samples a frame for a QR (ms). */
+const SCAN_INTERVAL_MS = 250
 
 /**
  * QR scanner (T4.3.1): reads a fiscal-receipt QR either from the live camera
  * (WebRTC, rear-facing where available) or from an uploaded image. Emits the raw
  * decoded string — the parent decides what to do with it (POST /scan-qr).
  *
- * The `@zxing/browser` reader requests the camera itself; we surface permission
- * and "no QR found" failures as inline messages rather than throwing.
+ * Decoding goes through the platform's native `BarcodeDetector` when available and
+ * falls back to the zbar WASM engine (see `lib/decode-qr`), which reads real
+ * receipt photos that the older `@zxing/browser` reader could not.
  */
 export function QrScanner({
   onDecode,
@@ -19,17 +23,29 @@ export function QrScanner({
   disabled?: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const controlsRef = useRef<IScannerControls | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const scratchRef = useRef<HTMLCanvasElement | null>(null)
+  const scanIntervalRef = useRef<number | null>(null)
+  const scanningRef = useRef(false)
+  const decodingFrameRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mountedRef = useRef(true)
 
   const [cameraOn, setCameraOn] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [decoding, setDecoding] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const stopCamera = useCallback(() => {
-    controlsRef.current?.stop()
-    controlsRef.current = null
+    scanningRef.current = false
+    if (scanIntervalRef.current !== null) {
+      window.clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    const video = videoRef.current
+    if (video) video.srcObject = null
     setCameraOn(false)
   }, [])
 
@@ -42,35 +58,61 @@ export function QrScanner({
     }
   }, [stopCamera])
 
+  // One sampling tick of the live-camera loop. Driven by an interval (rather than
+  // a self-rescheduling timeout) and guarded by `decodingFrameRef` so a slow
+  // decode never overlaps the next tick.
+  const scanFrame = useCallback(() => {
+    if (!scanningRef.current || decodingFrameRef.current) return
+    const video = videoRef.current
+    if (!video) return
+    const scratch = (scratchRef.current ??= document.createElement('canvas'))
+
+    decodingFrameRef.current = true
+    void decodeQrFromVideoFrame(video, scratch)
+      .then((qrRaw) => {
+        if (scanningRef.current && qrRaw) {
+          stopCamera()
+          onDecode(qrRaw)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        decodingFrameRef.current = false
+      })
+  }, [onDecode, stopCamera])
+
   async function startCamera() {
     setError(null)
     setStarting(true)
     try {
-      const reader = new BrowserQRCodeReader()
-      setCameraOn(true)
-      // `decodeFromConstraints` starts the camera stream *before* it resolves, so
-      // an unmount during this await would otherwise leave the controls in a dead
-      // ref and the camera live. Stop immediately if we're no longer mounted.
-      const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment' } },
-        videoRef.current!,
-        (result) => {
-          if (!result) return // no code in this frame — keep scanning
-          stopCamera()
-          onDecode(result.getText())
-        },
-      )
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      })
+      // An unmount during the await would otherwise leave the camera live.
       if (!mountedRef.current) {
-        controls.stop()
+        stream.getTracks().forEach((track) => track.stop())
         return
       }
-      controlsRef.current = controls
+      streamRef.current = stream
+      const video = videoRef.current!
+      video.srcObject = stream
+      await video.play()
+      setCameraOn(true)
+      scanningRef.current = true
+      decodingFrameRef.current = false
+      scanIntervalRef.current = window.setInterval(scanFrame, SCAN_INTERVAL_MS)
     } catch (err) {
-      setCameraOn(false)
+      stopCamera()
+      // The browser rejects getUserMedia synchronously (no permission prompt) when
+      // no camera device exists — that's `NotFoundError`, distinct from the user
+      // denying access (`NotAllowedError`).
+      const name = err instanceof DOMException ? err.name : ''
       setError(
-        err instanceof DOMException && err.name === 'NotAllowedError'
-          ? 'Нет доступа к камере. Разрешите доступ или загрузите изображение.'
-          : 'Не удалось запустить камеру. Попробуйте загрузить изображение.',
+        name === 'NotFoundError' || name === 'DevicesNotFoundError'
+          ? 'Камера не найдена на устройстве. Загрузите фото чека.'
+          : name === 'NotAllowedError'
+            ? 'Нет доступа к камере. Разрешите доступ или загрузите изображение.'
+            : 'Не удалось запустить камеру. Попробуйте загрузить изображение.',
       )
     } finally {
       setStarting(false)
@@ -84,15 +126,20 @@ export function QrScanner({
 
     setError(null)
     stopCamera()
-    const url = URL.createObjectURL(file)
+    setDecoding(true)
     try {
-      const reader = new BrowserQRCodeReader()
-      const result = await reader.decodeFromImageUrl(url)
-      onDecode(result.getText())
+      const qrRaw = await decodeQrFromImageFile(file)
+      if (qrRaw) {
+        onDecode(qrRaw)
+      } else {
+        setError(
+          'QR-код не распознан. Сфотографируйте чек ровно (без изгибов), ближе к QR-коду и при хорошем освещении.',
+        )
+      }
     } catch {
-      setError('QR-код не распознан на изображении. Попробуйте другое фото.')
+      setError('Не удалось обработать изображение. Попробуйте другое фото.')
     } finally {
-      URL.revokeObjectURL(url)
+      setDecoding(false)
     }
   }
 
@@ -108,10 +155,19 @@ export function QrScanner({
         />
         {!cameraOn && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Camera className="size-10" />
-            <p className="px-6 text-center text-sm">
-              Наведите камеру на QR-код чека или загрузите фото
-            </p>
+            {decoding ? (
+              <>
+                <Loader2 className="size-10 animate-spin" />
+                <p className="px-6 text-center text-sm">Распознаём QR-код…</p>
+              </>
+            ) : (
+              <>
+                <Camera className="size-10" />
+                <p className="px-6 text-center text-sm">
+                  Наведите камеру на QR-код чека или загрузите фото
+                </p>
+              </>
+            )}
           </div>
         )}
         {cameraOn && (
@@ -133,7 +189,7 @@ export function QrScanner({
           <Button
             type="button"
             className="flex-1"
-            disabled={disabled || starting}
+            disabled={disabled || starting || decoding}
             onClick={startCamera}
           >
             {starting ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
@@ -145,7 +201,7 @@ export function QrScanner({
           type="button"
           variant="outline"
           className="flex-1"
-          disabled={disabled}
+          disabled={disabled || decoding}
           onClick={() => fileInputRef.current?.click()}
         >
           <ImageUp className="size-4" /> Загрузить фото

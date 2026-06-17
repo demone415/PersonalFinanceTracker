@@ -10,6 +10,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Select @undecaf/zbar-wasm's "inlined" build so the WASM is embedded as
+    // base64 rather than fetched as a separate asset — no extra served file and
+    // identical behaviour in dev, build, and tests.
+    conditions: ['zbar-inlined', 'module', 'browser', 'development|production'],
   },
   server: {
     port: 5173,
