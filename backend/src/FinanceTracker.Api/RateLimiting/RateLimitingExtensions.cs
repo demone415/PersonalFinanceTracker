@@ -17,6 +17,9 @@ public static class RateLimitingExtensions
     /// <summary>Strict policy for login — brute-force / credential-stuffing protection.</summary>
     public const string LoginPolicy = "login";
 
+    /// <summary>Tighter policy for <c>GET /jobs/{id}/result</c> — each hit streams a whole file from storage.</summary>
+    public const string JobResultPolicy = "job-result";
+
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
     {
         services.AddRateLimiter(options =>
@@ -42,6 +45,18 @@ public static class RateLimitingExtensions
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                    }));
+
+            // GET /jobs/{id}/result — streams a file from MinIO through the API, so
+            // it's tighter than the generic limit to curb bandwidth abuse.
+            options.AddPolicy(JobResultPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: CallerKey(context),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0,
                     }));

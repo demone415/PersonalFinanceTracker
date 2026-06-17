@@ -25,6 +25,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserSe
     public DbSet<ReceiptItem> ReceiptItems => Set<ReceiptItem>();
     public DbSet<ChangeLog> ChangeLogs => Set<ChangeLog>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<BackgroundTask> BackgroundTasks => Set<BackgroundTask>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

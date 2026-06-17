@@ -25,4 +25,5 @@ export {
   useDeleteReceiptItem,
   useScanQr,
   useReceiptStatus,
+  useExportAccruals,
 } from './api/accrual-queries'

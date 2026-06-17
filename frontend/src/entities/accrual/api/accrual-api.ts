@@ -41,6 +41,16 @@ export const accrualApi = {
 
   getById: (id: string) => http<Accrual>(`/api/v1/accruals/${id}`),
 
+  /**
+   * Queues an async CSV export of the accruals matching `filter` (pagination is
+   * dropped — an export covers every matching row). Returns the job id to poll.
+   */
+  exportCsv: (filter: AccrualFilter = {}) => {
+    // Drop pagination — an export covers every matching row, not a page.
+    const query = toQueryString({ ...filter, page: undefined, pageSize: undefined })
+    return http<{ jobId: string }>(`/api/v1/accruals/export${query}`, { method: 'POST' })
+  },
+
   create: (input: AccrualInput) =>
     http<Accrual>('/api/v1/accruals', { method: 'POST', body: JSON.stringify(input) }),
 

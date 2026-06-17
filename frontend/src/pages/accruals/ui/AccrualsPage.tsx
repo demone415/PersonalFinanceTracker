@@ -13,6 +13,7 @@ import {
   filterToParams,
   parseFilterFromParams,
 } from '@/features/accrual-filter'
+import { ExportButton } from '@/features/accrual-export'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/skeleton'
 
@@ -84,9 +85,12 @@ export function AccrualsPage() {
             ← На главную
           </Link>
         </div>
-        {!showForm && (
-          <Button onClick={() => setShowForm(true)}>+ Добавить</Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportButton filter={filter} />
+          {!showForm && (
+            <Button onClick={() => setShowForm(true)}>+ Добавить</Button>
+          )}
+        </div>
       </header>
 
       {showForm && (
