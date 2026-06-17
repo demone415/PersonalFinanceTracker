@@ -7,6 +7,7 @@ using FinanceTracker.Infrastructure;
 using FinanceTracker.Infrastructure.Messaging;
 using FinanceTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
 using Serilog;
 using Wolverine;
@@ -62,6 +63,14 @@ builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ValidationFilter>();
     options.Filters.Add<IdempotencyFilter>();
+})
+.AddJsonOptions(options =>
+{
+    // Serialize enums as their string names (e.g. "Income", not 0) so the SPA's
+    // string union types (AccrualType, …) match the wire format. Without this the
+    // default integer enums break client-side type checks (e.g. income rendered
+    // as an outflow).
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 // OpenAPI document "v1" — matches the URL-segment API version (/api/v1).
