@@ -15,10 +15,12 @@ internal sealed class BackgroundTaskConfiguration : IEntityTypeConfiguration<Bac
         builder.Property(t => t.Type).IsRequired();
         builder.Property(t => t.Status).IsRequired();
         builder.Property(t => t.Progress).IsRequired();
+        builder.Property(t => t.Attempts).IsRequired();
 
-        // The opaque MinIO object key (256-bit random, Base64Url) and the failure
-        // message; both are nullable until the job reaches a terminal state.
-        builder.Property(t => t.ResultObjectKey).HasMaxLength(128);
+        // The opaque MinIO object key (256-bit random, Base64Url) is assigned at
+        // creation and stable for the task's life. The failure message is null
+        // until the job fails terminally.
+        builder.Property(t => t.ResultObjectKey).HasMaxLength(128).IsRequired();
         builder.Property(t => t.Error).HasMaxLength(1000);
 
         builder.Property(t => t.CreatedAt).IsRequired();

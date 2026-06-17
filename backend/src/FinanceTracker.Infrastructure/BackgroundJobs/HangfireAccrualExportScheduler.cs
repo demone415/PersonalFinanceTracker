@@ -13,4 +13,7 @@ internal sealed class HangfireAccrualExportScheduler(IBackgroundJobClient client
 {
     public void Enqueue(Guid taskId, AccrualExportFilter filter) =>
         client.Enqueue<AccrualExportJob>(job => job.RunAsync(taskId, filter, CancellationToken.None));
+
+    public void ScheduleRetry(Guid taskId, AccrualExportFilter filter, TimeSpan delay) =>
+        client.Schedule<AccrualExportJob>(job => job.RunAsync(taskId, filter, CancellationToken.None), delay);
 }

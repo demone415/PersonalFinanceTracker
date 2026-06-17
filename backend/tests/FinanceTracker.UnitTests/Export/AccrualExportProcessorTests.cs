@@ -12,9 +12,10 @@ namespace FinanceTracker.UnitTests.Export;
 /// <summary>
 /// The off-request CSV export decision tree (T6.2.1): owner-scoped querying
 /// (bypassing the data-isolation filter under a background no-user context),
-/// filter application, terminal state transitions, idempotency and the failure
-/// path — driven through the real <see cref="AccrualExportProcessor"/> against an
-/// in-memory database with the real CSV writer and a fake object store.
+/// filter application, terminal state transitions, idempotency, the bounded
+/// retry path and the failure path — driven through the real
+/// <see cref="AccrualExportProcessor"/> against an in-memory database with the
+/// real CSV writer and a fake object store.
 /// </summary>
 public class AccrualExportProcessorTests
 {
@@ -34,6 +35,8 @@ public class AccrualExportProcessorTests
     {
         public readonly Dictionary<string, byte[]> Objects = new();
         public int UploadCount { get; private set; }
+
+        /// <summary>Invoked at the start of each upload; throw from it to simulate a failure.</summary>
         public Action? OnUpload { get; set; }
 
         public async Task UploadAsync(string objectKey, Stream content, string contentType, CancellationToken cancellationToken = default)
@@ -124,17 +127,19 @@ public class AccrualExportProcessorTests
         h.SeedAccrual(Owner, 200m, description: "fuel");
         var task = h.SeedTask(Owner);
 
-        var outcome = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
+        var result = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
 
-        Assert.Equal(AccrualExportOutcome.Completed, outcome);
+        Assert.Equal(AccrualExportOutcome.Completed, result.Status);
         var saved = h.Reload(task.Id);
         Assert.Equal(BackgroundTaskStatus.Done, saved.Status);
         Assert.Equal(100, saved.Progress);
-        Assert.NotNull(saved.ResultObjectKey);
+        Assert.Equal(0, saved.Attempts);
         Assert.Equal(Now, saved.CompletedAt);
         Assert.Equal(1, h.Storage.UploadCount);
-        Assert.True(h.Storage.Objects.ContainsKey(saved.ResultObjectKey!));
-        Assert.Equal(2, h.DataLines(saved.ResultObjectKey!).Length);
+        // The upload targets the task's stable, pre-assigned object key.
+        Assert.Equal(task.ResultObjectKey, saved.ResultObjectKey);
+        Assert.True(h.Storage.Objects.ContainsKey(saved.ResultObjectKey));
+        Assert.Equal(2, h.DataLines(saved.ResultObjectKey).Length);
     }
 
     [Fact]
@@ -148,7 +153,7 @@ public class AccrualExportProcessorTests
 
         await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
 
-        var key = h.Reload(task.Id).ResultObjectKey!;
+        var key = h.Reload(task.Id).ResultObjectKey;
         var lines = h.DataLines(key);
         Assert.Equal(2, lines.Length);
         Assert.DoesNotContain(lines, l => l.Contains("not-mine"));
@@ -165,7 +170,7 @@ public class AccrualExportProcessorTests
 
         await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter(Type: AccrualType.Income));
 
-        var lines = h.DataLines(h.Reload(task.Id).ResultObjectKey!);
+        var lines = h.DataLines(h.Reload(task.Id).ResultObjectKey);
         Assert.Single(lines);
         Assert.Contains("an-income", lines[0]);
     }
@@ -181,9 +186,26 @@ public class AccrualExportProcessorTests
 
         await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter(AmountMin: 100m, AmountMax: 200m));
 
-        var lines = h.DataLines(h.Reload(task.Id).ResultObjectKey!);
+        var lines = h.DataLines(h.Reload(task.Id).ResultObjectKey);
         Assert.Single(lines);
         Assert.Contains("within", lines[0]);
+    }
+
+    [Fact]
+    public async Task DateFilter_BoundsTheExportedRows()
+    {
+        var h = new Harness(nameof(DateFilter_BoundsTheExportedRows));
+        h.SeedAccrual(Owner, 10m, date: Now.AddDays(-10), description: "too-old");
+        h.SeedAccrual(Owner, 20m, date: Now.AddDays(-2), description: "in-range");
+        h.SeedAccrual(Owner, 30m, date: Now.AddDays(5), description: "too-new");
+        var task = h.SeedTask(Owner);
+
+        await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter(
+            DateFrom: Now.AddDays(-5), DateTo: Now.AddDays(1)));
+
+        var lines = h.DataLines(h.Reload(task.Id).ResultObjectKey);
+        Assert.Single(lines);
+        Assert.Contains("in-range", lines[0]);
     }
 
     [Fact]
@@ -194,9 +216,9 @@ public class AccrualExportProcessorTests
         var task = h.SeedTask(Owner);
 
         await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter()); // first → Done
-        var outcome = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter()); // second → no-op
+        var result = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter()); // second → no-op
 
-        Assert.Equal(AccrualExportOutcome.Skipped, outcome);
+        Assert.Equal(AccrualExportOutcome.Skipped, result.Status);
         Assert.Equal(1, h.Storage.UploadCount); // not re-uploaded
     }
 
@@ -205,26 +227,79 @@ public class AccrualExportProcessorTests
     {
         var h = new Harness(nameof(MissingTask_IsSkipped));
 
-        var outcome = await h.Processor.ProcessAsync(Guid.NewGuid(), new AccrualExportFilter());
+        var result = await h.Processor.ProcessAsync(Guid.NewGuid(), new AccrualExportFilter());
 
-        Assert.Equal(AccrualExportOutcome.Skipped, outcome);
+        Assert.Equal(AccrualExportOutcome.Skipped, result.Status);
         Assert.Equal(0, h.Storage.UploadCount);
     }
 
     [Fact]
-    public async Task StorageFailure_MarksTaskFailed_WithError()
+    public async Task TransientFailure_IsRescheduled_AndKeepsTaskRunning()
     {
-        var h = new Harness(nameof(StorageFailure_MarksTaskFailed_WithError));
+        var h = new Harness(nameof(TransientFailure_IsRescheduled_AndKeepsTaskRunning));
         h.SeedAccrual(Owner, 100m);
         var task = h.SeedTask(Owner);
         h.Storage.OnUpload = () => throw new InvalidOperationException("storage exploded");
 
-        var outcome = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
+        var result = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
 
-        Assert.Equal(AccrualExportOutcome.Failed, outcome);
+        Assert.Equal(AccrualExportOutcome.Rescheduled, result.Status);
+        Assert.NotNull(result.RetryDelay);
+        var saved = h.Reload(task.Id);
+        // Still Running so the UI keeps showing the export in progress between attempts.
+        Assert.Equal(BackgroundTaskStatus.Running, saved.Status);
+        Assert.Equal(1, saved.Attempts);
+        Assert.Null(saved.Error);
+        Assert.Null(saved.CompletedAt);
+    }
+
+    [Fact]
+    public async Task ExhaustingAttempts_MarksTaskFailed_WithStandardizedError()
+    {
+        var h = new Harness(nameof(ExhaustingAttempts_MarksTaskFailed_WithStandardizedError));
+        h.SeedAccrual(Owner, 100m);
+        var task = h.SeedTask(Owner);
+        h.Storage.OnUpload = () => throw new InvalidOperationException("secret infra detail: minio://bucket");
+
+        AccrualExportResult result = new(AccrualExportOutcome.Skipped);
+        for (var i = 0; i < BackgroundTask.MaxAttempts; i++)
+            result = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
+
+        Assert.Equal(AccrualExportOutcome.Failed, result.Status);
         var saved = h.Reload(task.Id);
         Assert.Equal(BackgroundTaskStatus.Failed, saved.Status);
-        Assert.Contains("storage exploded", saved.Error);
+        Assert.Equal(BackgroundTask.MaxAttempts, saved.Attempts);
         Assert.Equal(Now, saved.CompletedAt);
+        // The raw exception text must never reach the user-visible Error.
+        Assert.Equal(AccrualExportProcessor.FailureMessage, saved.Error);
+        Assert.DoesNotContain("minio", saved.Error!);
+        Assert.DoesNotContain("infra detail", saved.Error!);
+    }
+
+    [Fact]
+    public async Task Retry_OverwritesTheSameObjectKey()
+    {
+        var h = new Harness(nameof(Retry_OverwritesTheSameObjectKey));
+        h.SeedAccrual(Owner, 100m);
+        var task = h.SeedTask(Owner);
+
+        // Fail the first upload, then let the retry succeed.
+        var attempts = 0;
+        h.Storage.OnUpload = () =>
+        {
+            if (++attempts == 1) throw new InvalidOperationException("first attempt fails");
+        };
+
+        var first = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
+        var second = await h.Processor.ProcessAsync(task.Id, new AccrualExportFilter());
+
+        Assert.Equal(AccrualExportOutcome.Rescheduled, first.Status);
+        Assert.Equal(AccrualExportOutcome.Completed, second.Status);
+
+        var saved = h.Reload(task.Id);
+        Assert.Equal(BackgroundTaskStatus.Done, saved.Status);
+        // One object only — the retry overwrote the stable key, it did not orphan a new file.
+        Assert.Single(h.Storage.Objects);
+        Assert.True(h.Storage.Objects.ContainsKey(saved.ResultObjectKey));
     }
 }

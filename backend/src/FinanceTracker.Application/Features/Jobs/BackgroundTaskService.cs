@@ -55,7 +55,9 @@ public sealed class BackgroundTaskService(
         task.Error,
         task.CreatedAt,
         task.CompletedAt,
-        task.ResultObjectKey is not null);
+        // The object key is assigned at creation, so a result is downloadable only
+        // once the job is Done — not merely because the key exists.
+        task.Status == BackgroundTaskStatus.Done);
 
     private static string ContentTypeFor(BackgroundTaskType type) => type switch
     {

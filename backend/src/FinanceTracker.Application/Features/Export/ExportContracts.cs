@@ -28,6 +28,13 @@ public interface IAccrualExportScheduler
 {
     /// <summary>Queues the export job for the given (already-persisted) task.</summary>
     void Enqueue(Guid taskId, AccrualExportFilter filter);
+
+    /// <summary>
+    /// Re-queues the export job after a transient failure, to run once
+    /// <paramref name="delay"/> has elapsed (the job stays on the <c>exports</c>
+    /// queue). Mirrors the receipt-fetch reschedule scheme.
+    /// </summary>
+    void ScheduleRetry(Guid taskId, AccrualExportFilter filter, TimeSpan delay);
 }
 
 /// <summary>Hangfire queue names for async import/export jobs (Epic 6).</summary>

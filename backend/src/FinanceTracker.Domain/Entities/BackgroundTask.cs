@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using FinanceTracker.Domain.Common;
 using FinanceTracker.Domain.Enums;
 
@@ -22,16 +23,39 @@ public class BackgroundTask : IUserOwnedEntity
     public int Progress { get; private set; }
 
     /// <summary>
-    /// Opaque, cryptographically random key (256-bit) of the result object in
-    /// MinIO; <c>null</c> until the job completes. Never returned to the client.
+    /// Opaque, cryptographically random key (256-bit, Base64Url) of the result
+    /// object in MinIO. Assigned once at creation and <b>stable for the life of the
+    /// task</b>, so a retried/resumed run overwrites the same object instead of
+    /// orphaning a fresh one. It is random — deliberately <b>not</b> derived from
+    /// the (enumerable, time-ordered) <see cref="Id"/> — so it remains the
+    /// file-unguessability layer (CLAUDE.md: ids are enumerable and not secrets).
+    /// Never returned to the client; downloadable only once <see cref="Status"/> is
+    /// <see cref="BackgroundTaskStatus.Done"/>.
     /// </summary>
-    public string? ResultObjectKey { get; private set; }
+    public string ResultObjectKey { get; private set; } = null!;
 
     /// <summary>Failure detail when <see cref="Status"/> is <see cref="BackgroundTaskStatus.Failed"/>.</summary>
     public string? Error { get; private set; }
 
+    /// <summary>How many processing attempts have been made (incremented on each failed attempt).</summary>
+    public int Attempts { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
+
+    /// <summary>Maximum processing attempts before the job is marked terminally Failed.</summary>
+    public const int MaxAttempts = 3;
+
+    /// <summary>
+    /// Back-off before the 2nd…Nth attempt. With <see cref="MaxAttempts"/> = 3 there
+    /// are two delays, so a job that keeps failing is tried at most three times
+    /// before it is terminally Failed.
+    /// </summary>
+    private static readonly TimeSpan[] RetryDelays =
+    [
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(2),
+    ];
 
     private BackgroundTask() { }
 
@@ -42,6 +66,8 @@ public class BackgroundTask : IUserOwnedEntity
         Type = type;
         Status = BackgroundTaskStatus.Pending;
         Progress = 0;
+        Attempts = 0;
+        ResultObjectKey = NewObjectKey(type);
         CreatedAt = DateTimeOffset.UtcNow;
     }
 
@@ -59,23 +85,57 @@ public class BackgroundTask : IUserOwnedEntity
     public void ReportProgress(int percent) =>
         Progress = Math.Clamp(percent, 0, 100);
 
-    /// <summary>Completes the job: the result is available under <paramref name="resultObjectKey"/>.</summary>
-    public void Complete(string resultObjectKey, DateTimeOffset completedAt)
-    {
-        if (string.IsNullOrWhiteSpace(resultObjectKey))
-            throw new ArgumentException("A completed task must carry a result object key.", nameof(resultObjectKey));
+    /// <summary>Records a failed processing attempt (used to drive the retry budget).</summary>
+    public void RecordAttempt() => Attempts++;
 
+    /// <summary>Whether another attempt is allowed under <see cref="MaxAttempts"/>.</summary>
+    public bool HasAttemptsRemaining => Attempts < MaxAttempts;
+
+    /// <summary>
+    /// The wait before the next attempt given the attempts made so far, or
+    /// <c>null</c> when the retry budget is exhausted (caller should mark Failed).
+    /// </summary>
+    public TimeSpan? GetNextRetryDelay()
+    {
+        var index = Attempts - 1; // delay that follows the attempt just made
+        return index >= 0 && index < RetryDelays.Length ? RetryDelays[index] : null;
+    }
+
+    /// <summary>Completes the job: the result is available under <see cref="ResultObjectKey"/>.</summary>
+    public void Complete(DateTimeOffset completedAt)
+    {
         Status = BackgroundTaskStatus.Done;
         Progress = 100;
-        ResultObjectKey = resultObjectKey;
         CompletedAt = completedAt;
     }
 
-    /// <summary>Marks the job as failed with a human-readable <paramref name="error"/>.</summary>
+    /// <summary>Marks the job as terminally failed with a human-readable <paramref name="error"/>.</summary>
     public void Fail(string error, DateTimeOffset completedAt)
     {
         Status = BackgroundTaskStatus.Failed;
         Error = error;
         CompletedAt = completedAt;
+    }
+
+    /// <summary>
+    /// A cryptographically random, opaque 256-bit object key (URL-safe Base64, no
+    /// padding) under a per-type prefix. The key — never the GUID id — is what
+    /// makes the stored file unguessable.
+    /// </summary>
+    private static string NewObjectKey(BackgroundTaskType type)
+    {
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+
+        var (prefix, extension) = type switch
+        {
+            BackgroundTaskType.ExportCsv => ("exports", "csv"),
+            BackgroundTaskType.ImportJson => ("imports", "json"),
+            _ => ("files", "bin"),
+        };
+
+        return $"{prefix}/{token}.{extension}";
     }
 }
