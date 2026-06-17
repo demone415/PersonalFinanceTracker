@@ -14,7 +14,7 @@
     "@hookform/resolvers": "^5.4.0",
     "@supabase/supabase-js": "^2.108.1",
     "@tanstack/react-query": "^5.101.0",
-    "@zxing/browser": "^0.2.0",
+    "@undecaf/zbar-wasm": "^0.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lottie-react": "^2.4.1",
