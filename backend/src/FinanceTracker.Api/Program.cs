@@ -120,10 +120,11 @@ app.MapPrometheusScrapingEndpoint();
 
 app.MapGet("/", () => "FinanceTracker API");
 
-// Run EF migrations and seed initial data before accepting requests.
-await DatabaseSeeder.SeedAsync(
+// Apply EF migrations before accepting requests. Demo data is seeded separately
+// by the Docker-only `db-seed` service (backend/db/seed.sql).
+await DatabaseMigrator.MigrateAsync(
     app.Configuration,
-    app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Seeder"));
+    app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Migrator"));
 
 app.Run();
 

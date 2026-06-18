@@ -3,7 +3,7 @@
 # All services start with a single:  docker compose up
 #
 # Startup order (via healthcheck depends_on):
-#   postgres → supabase-auth → backend (runs migrations + seeds data) → frontend
+#   postgres → supabase-auth → backend (runs migrations) → db-seed (SQL) → frontend
 
 services:
   # ── PostgreSQL (Supabase image — includes the auth.* schema) ────────────────
@@ -108,9 +108,8 @@ services:
       start_period: 20s
 
   # ── Backend (.NET 10 API) ─────────────────────────────────────────────────────
-  # Waits for GoTrue to be healthy, then runs EF migrations + seeds data before
-  # starting to accept requests. Health probe starts after start_period to allow
-  # time for seeding on first run.
+  # Waits for GoTrue to be healthy, then runs EF migrations before starting to
+  # accept requests. Demo data is seeded separately by the `db-seed` service.
   backend:
     build:
       context: ./backend
@@ -140,8 +139,7 @@ services:
       Supabase__JwtSecret:       ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
       Supabase__Issuer:          "${GOTRUE_EXTERNAL_URL:-http://localhost:9999}/auth/v1"
       Supabase__Audience:        authenticated
-      # Internal URL used by DatabaseSeeder to call the GoTrue Admin API
-      Supabase__AdminApiUrl:     "http://supabase-auth:9999"
+      ReceiptProvider__Token:    ${RECEIPT_PROVIDER_TOKEN:-}
     ports:
       - "5000:8080"
     healthcheck:
@@ -151,8 +149,26 @@ services:
       retries: 20
       start_period: 60s
 
+  # ── DB seed (one-shot) ───────────────────────────────────────────────────────
+  # Seeds demo data via SQL, only under Docker. Waits for the backend (EF
+  # migrations applied → public.* tables exist) and GoTrue (auth.* schema ready),
+  # runs seed.sql once and exits. The script is idempotent, so re-runs are no-ops.
+  db-seed:
+    image: postgres:15-alpine
+    depends_on:
+      backend:
+        condition: service_healthy
+      supabase-auth:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./backend/db/seed.sql:/seed/seed.sql:ro
+    entrypoint: ["sh", "-c", "psql -h postgres -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-finance} -v ON_ERROR_STOP=1 -f /seed/seed.sql"]
+    restart: "no"
+
   # ── Frontend (React SPA via nginx) ───────────────────────────────────────────
-  # Waits for backend to be healthy (migrations + seed done) before starting.
+  # Waits for the seed to finish so the demo logins exist on first paint.
   frontend:
     build:
       context: ./frontend
@@ -166,6 +182,8 @@ services:
         condition: service_healthy
       supabase-auth:
         condition: service_healthy
+      db-seed:
+        condition: service_completed_successfully
     ports:
       - "3000:80"
 
