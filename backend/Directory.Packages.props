@@ -65,6 +65,10 @@
     <PackageVersion Include="AWSSDK.S3" Version="4.0.24.4" />
     <PackageVersion Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.4.7" />
   </ItemGroup>
+  <!-- Spreadsheet reading: ClosedXML (over OpenXML) for the FNS .xlsx import (Story 6.1). -->
+  <ItemGroup>
+    <PackageVersion Include="ClosedXML" Version="0.104.2" />
+  </ItemGroup>
   <!-- Health checks: Postgres / Redis / RabbitMQ / MinIO readiness probes -->
   <ItemGroup>
     <PackageVersion Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />

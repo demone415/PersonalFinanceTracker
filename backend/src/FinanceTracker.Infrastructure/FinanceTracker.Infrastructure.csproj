@@ -33,6 +33,11 @@
     <PackageReference Include="AWSSDK.S3" />
   </ItemGroup>
 
+  <!-- FNS .xlsx import parsing (Story 6.1) -->
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" />
+  </ItemGroup>
+
   <!-- External receipt provider (ProverkaCheka): Refit client + Polly resilience;
        StackExchange.Redis backs the daily-quota rate limiter. -->
   <ItemGroup>

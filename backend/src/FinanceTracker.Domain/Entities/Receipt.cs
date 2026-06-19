@@ -91,6 +91,31 @@ public class Receipt : IUserOwnedEntity
         return r;
     }
 
+    /// <summary>
+    /// Creates a receipt imported from an FNS «Налоги ФЛ» Excel export (Story 6.1).
+    /// Already <see cref="ReceiptFetchStatus.Fetched"/> — there is no provider fetch.
+    /// The <paramref name="externalNumber"/> (FNS «Номер чека») together with
+    /// <paramref name="inn"/> and <paramref name="date"/> is the import dedup key.
+    /// </summary>
+    public static Receipt CreateImported(
+        Guid userId, string externalNumber, long amountInKopecks, DateTimeOffset date,
+        string? organization = null, string? address = null, string? inn = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalNumber);
+        return new Receipt
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            ExternalNumber = externalNumber,
+            AmountInKopecks = amountInKopecks,
+            Date = date,
+            Organization = organization,
+            Address = address,
+            INN = inn,
+            FetchStatus = ReceiptFetchStatus.Fetched,
+        };
+    }
+
     public void AddItem(ReceiptItem item) => _items.Add(item);
 
     public void RemoveItem(ReceiptItem item) => _items.Remove(item);
