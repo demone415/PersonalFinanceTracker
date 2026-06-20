@@ -1,4 +1,6 @@
 import { http } from '@/shared/api/http'
+import { env } from '@/shared/config/env'
+import { supabase } from '@/shared/api/supabase'
 import type {
   Accrual,
   AccrualFilter,
@@ -49,6 +51,32 @@ export const accrualApi = {
     // Drop pagination — an export covers every matching row, not a page.
     const query = toQueryString({ ...filter, page: undefined, pageSize: undefined })
     return http<{ jobId: string }>(`/api/v1/accruals/export${query}`, { method: 'POST' })
+  },
+
+  /**
+   * Uploads an FNS «Налоги ФЛ» Excel export to start an async import (T6.1.4).
+   * Sent as `multipart/form-data` (field `file`), so it bypasses the JSON `http`
+   * wrapper and uses a raw fetch with the Bearer token (the browser sets the
+   * multipart boundary itself). Returns the job id to poll.
+   */
+  importFns: async (file: File): Promise<{ jobId: string }> => {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+
+    const form = new FormData()
+    form.append('file', file)
+
+    const response = await fetch(`${env.apiUrl}/api/v1/accruals/import`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.status} ${response.statusText}`)
+    }
+
+    return (await response.json()) as { jobId: string }
   },
 
   create: (input: AccrualInput) =>

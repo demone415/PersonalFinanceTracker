@@ -108,8 +108,12 @@ public class AccrualImportProcessorTests
         public BackgroundTask Reload(Guid id) =>
             Db.BackgroundTasks.IgnoreQueryFilters().AsNoTracking().Single(t => t.Id == id);
 
+        // The blob is written with web defaults (camelCase) to match the rest of
+        // the API, so read it back the same way.
         public ImportSummary ReadSummary(string key) =>
-            JsonSerializer.Deserialize<ImportSummary>(Encoding.UTF8.GetString(Storage.Objects[key]))!;
+            JsonSerializer.Deserialize<ImportSummary>(
+                Encoding.UTF8.GetString(Storage.Objects[key]),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
     }
 
     private static ParsedReceipt MakeReceipt(

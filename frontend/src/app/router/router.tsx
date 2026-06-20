@@ -8,6 +8,7 @@ import { BudgetsPage } from '@/pages/budgets'
 import { AccrualsPage } from '@/pages/accruals'
 import { AccrualDetailPage } from '@/pages/accrual-detail'
 import { ScanPage } from '@/pages/scan'
+import { ImportPage } from '@/pages/import'
 import { JournalPage } from '@/pages/journal'
 import { SettingsPage } from '@/pages/settings'
 import { AppShell } from '@/widgets/app-shell'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: '/journal', element: <JournalPage /> },
           { path: '/settings', element: <SettingsPage /> },
           { path: '/scan', element: <ScanPage /> },
+          { path: '/import', element: <ImportPage /> },
           {
             element: <AdminRoute />,
             children: [{ path: '/admin', element: <AdminPage /> }],

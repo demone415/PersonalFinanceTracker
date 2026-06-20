@@ -58,6 +58,17 @@ export function useExportAccruals() {
   })
 }
 
+/**
+ * Starts an async FNS Excel import (T6.1.4) and returns the job id. Orchestration
+ * (global tracking + summary toast) lives in the accrual-import feature and the
+ * app-level background-task tracker.
+ */
+export function useImportAccruals() {
+  return useMutation({
+    mutationFn: (file: File) => accrualApi.importFns(file),
+  })
+}
+
 /** Submit a scanned QR string (T4.3.2). Refreshes lists so the new accrual appears. */
 export function useScanQr() {
   const qc = useQueryClient()
