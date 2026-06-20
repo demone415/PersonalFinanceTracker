@@ -6,8 +6,8 @@ namespace FinanceTracker.Domain.Enums;
 /// </summary>
 public enum BackgroundTaskType
 {
-    /// <summary>Import of an FNS «Налоги ФЛ» JSON export (Story 6.1).</summary>
-    ImportJson = 0,
+    /// <summary>Import of an FNS «Налоги ФЛ» receipts export — an Excel (.xlsx) workbook (Story 6.1).</summary>
+    ImportFns = 0,
 
     /// <summary>Export of filtered accruals to CSV (Story 6.2).</summary>
     ExportCsv = 1,

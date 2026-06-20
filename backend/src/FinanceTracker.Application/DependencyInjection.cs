@@ -4,6 +4,7 @@ using FinanceTracker.Application.Features.Categories;
 using FinanceTracker.Application.Features.ChangeLog;
 using FinanceTracker.Application.Features.Dashboard;
 using FinanceTracker.Application.Features.Export;
+using FinanceTracker.Application.Features.Import;
 using FinanceTracker.Application.Features.Jobs;
 using FinanceTracker.Application.Features.Profile;
 using FinanceTracker.Application.Features.Receipts;
@@ -38,6 +39,11 @@ public static class DependencyInjection
         services.AddScoped<AccrualExportProcessor>();
         services.AddScoped<BackgroundTaskService>();
         services.AddSingleton<IAccrualCsvExporter, CsvAccrualExporter>();
+
+        // Async FNS import (Story 6.1): the enqueue producer and the off-request
+        // processor that parses the .xlsx and creates accruals + receipts.
+        services.AddScoped<AccrualImportService>();
+        services.AddScoped<AccrualImportProcessor>();
 
         // System clock — overridden with a fake in unit tests for deterministic retries.
         services.TryAddSingleton(TimeProvider.System);

@@ -1,7 +1,9 @@
 using FinanceTracker.Application.Common.Interfaces;
 using FinanceTracker.Application.Features.Export;
+using FinanceTracker.Application.Features.Import;
 using FinanceTracker.Application.Features.Receipts;
 using FinanceTracker.Infrastructure.Messaging;
+using FinanceTracker.Infrastructure.Persistence.Import;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.Extensions.Configuration;
@@ -40,13 +42,13 @@ public static class BackgroundProcessingServiceCollectionExtensions
             options.WorkerCount = 1;
         });
 
-        // A separate server for async import/export (Story 6.2): kept off the
-        // single-worker receipts queue so a long CSV export never blocks receipt
-        // fetching, and exports may run a few at a time.
+        // A separate server for async import/export (Epic 6): kept off the
+        // single-worker receipts queue so a long export/import never blocks receipt
+        // fetching, and these jobs may run a few at a time.
         services.AddHangfireServer(options =>
         {
-            options.ServerName = "exports";
-            options.Queues = [ExportQueues.Exports];
+            options.ServerName = "import-export";
+            options.Queues = [ExportQueues.Exports, ImportQueues.Imports];
             options.WorkerCount = 2;
         });
 
@@ -54,6 +56,12 @@ public static class BackgroundProcessingServiceCollectionExtensions
         services.AddScoped<ReceiptDispatchJob>();
         services.AddScoped<AccrualExportJob>();
         services.AddScoped<IAccrualExportScheduler, HangfireAccrualExportScheduler>();
+
+        // Async FNS import (Story 6.1): the Hangfire job, the Application-facing
+        // scheduler, and the ClosedXML-backed workbook parser.
+        services.AddScoped<AccrualImportJob>();
+        services.AddScoped<IAccrualImportScheduler, HangfireAccrualImportScheduler>();
+        services.AddSingleton<IFnsReceiptParser, ClosedXmlFnsReceiptParser>();
 
         // Wolverine/Hangfire-backed implementations of the Application abstractions.
         services.AddScoped<IReceiptFetchScheduler, HangfireReceiptFetchScheduler>();

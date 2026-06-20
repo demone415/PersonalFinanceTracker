@@ -1,6 +1,8 @@
 using FinanceTracker.Api.RateLimiting;
+using FinanceTracker.Application.Common.Exceptions;
 using FinanceTracker.Application.Features.Accruals;
 using FinanceTracker.Application.Features.Export;
+using FinanceTracker.Application.Features.Import;
 using FinanceTracker.Application.Features.Receipts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -71,6 +73,30 @@ public sealed class AccrualsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var response = await service.CreateExportAsync(filter, cancellationToken);
+        return Accepted($"/api/v1/jobs/{response.JobId}", response);
+    }
+
+    // ── Async FNS import (Story 6.1 / T6.1.x) ────────────────────────────────
+
+    /// <summary>
+    /// Queues an async import of an FNS «Налоги ФЛ» receipts export (.xlsx).
+    /// Returns 202 with the job id; poll <c>GET /api/v1/jobs/{id}</c> and download
+    /// the summary via <c>GET /api/v1/jobs/{id}/result</c> once it is Done. Each
+    /// receipt becomes an Expense accrual with a linked receipt + line items;
+    /// receipts already present (by number + seller INN + date) are skipped.
+    /// </summary>
+    [HttpPost("import")]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    public async Task<ActionResult<ImportJobResponse>> Import(
+        IFormFile file,
+        [FromServices] AccrualImportService service,
+        CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+            throw new ValidationException("Не приложен файл для импорта.");
+
+        await using var stream = file.OpenReadStream();
+        var response = await service.CreateImportAsync(stream, cancellationToken);
         return Accepted($"/api/v1/jobs/{response.JobId}", response);
     }
 

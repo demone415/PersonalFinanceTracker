@@ -132,7 +132,9 @@ public class BackgroundTask : IUserOwnedEntity
         var (prefix, extension) = type switch
         {
             BackgroundTaskType.ExportCsv => ("exports", "csv"),
-            BackgroundTaskType.ImportJson => ("imports", "json"),
+            // The import result is a JSON summary (counts + warnings); the source
+            // .xlsx is stored separately under its own key.
+            BackgroundTaskType.ImportFns => ("imports", "json"),
             _ => ("files", "bin"),
         };
 

@@ -62,14 +62,18 @@ public sealed class BackgroundTaskService(
     private static string ContentTypeFor(BackgroundTaskType type) => type switch
     {
         BackgroundTaskType.ExportCsv => "text/csv",
+        BackgroundTaskType.ImportFns => "application/json",
         _ => "application/octet-stream",
     };
 
     private static string BuildFileName(BackgroundTask task)
     {
         var stamp = task.CreatedAt.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-        return task.Type == BackgroundTaskType.ExportCsv
-            ? $"accruals-export-{stamp}.csv"
-            : $"job-{task.Id}";
+        return task.Type switch
+        {
+            BackgroundTaskType.ExportCsv => $"accruals-export-{stamp}.csv",
+            BackgroundTaskType.ImportFns => $"import-summary-{stamp}.json",
+            _ => $"job-{task.Id}",
+        };
     }
 }

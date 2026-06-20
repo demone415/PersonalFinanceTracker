@@ -29,6 +29,8 @@ public class CurrencyConversionTests
     {
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
             ctx.SaveChangesAsync(cancellationToken);
+
+        public void DiscardChanges() => ctx.ChangeTracker.Clear();
     }
 
     // Pass-through cache: always computes, never stores — isolates the aggregation.
