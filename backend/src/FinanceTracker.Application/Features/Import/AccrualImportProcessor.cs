@@ -261,7 +261,10 @@ public sealed class AccrualImportProcessor(
 
     private static long ToKopecks(decimal rubles) => (long)Math.Round(rubles * 100m, MidpointRounding.AwayFromZero);
 
-    private static readonly JsonSerializerOptions SummaryJsonOptions = new()
+    // Web defaults (camelCase) so the streamed result blob matches the rest of the
+    // API — GET /jobs/{id}/result streams this verbatim, bypassing the controller's
+    // JSON pipeline, so the SPA's camelCase ImportSummary would otherwise see nulls.
+    private static readonly JsonSerializerOptions SummaryJsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,

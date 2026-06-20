@@ -6,7 +6,7 @@ import { isTerminalStatus } from './types'
 interface BackgroundTasksState {
   tasks: TrackedTask[]
   /** Begins tracking a freshly-started job (replacing any entry with the same id). */
-  track: (task: { id: string; kind: BgTaskKind; label: string }) => void
+  track: (task: { id: string; userId: string; kind: BgTaskKind; label: string }) => void
   /** Patches a tracked job (status sync, summary, handled flag). No-op if unknown. */
   update: (id: string, patch: Partial<Omit<TrackedTask, 'id'>>) => void
   /** Stops tracking a job. */
@@ -29,12 +29,13 @@ export const useBackgroundTasks = create<BackgroundTasksState>()(
     (set) => ({
       tasks: [],
 
-      track: ({ id, kind, label }) =>
+      track: ({ id, userId, kind, label }) =>
         set((state) => ({
           tasks: [
             ...state.tasks.filter((t) => t.id !== id),
             {
               id,
+              userId,
               kind,
               label,
               startedAt: Date.now(),
@@ -68,6 +69,15 @@ export const useBackgroundTasks = create<BackgroundTasksState>()(
 /** Convenience selector: jobs still in flight (Pending/Running). */
 export function selectActiveTasks(state: BackgroundTasksState): TrackedTask[] {
   return state.tasks.filter((t) => !isTerminalStatus(t.status))
+}
+
+/**
+ * The given user's tracked tasks. The store is persisted in one shared
+ * `localStorage` key, so always filter by the signed-in user before watching or
+ * displaying tasks — a job must only ever surface to the user who started it.
+ */
+export function tasksForUser(tasks: TrackedTask[], userId: string | null): TrackedTask[] {
+  return userId ? tasks.filter((t) => t.userId === userId) : []
 }
 
 export type { ImportSummary }

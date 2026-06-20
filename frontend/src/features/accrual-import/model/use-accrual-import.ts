@@ -1,5 +1,6 @@
 import { useImportAccruals } from '@/entities/accrual'
 import { useBackgroundTasks } from '@/entities/background-task'
+import { useSessionStore } from '@/entities/session'
 import { useToastStore } from '@/shared/lib/toast'
 
 /** Maps a failed start request to a user-facing message by HTTP status. */
@@ -19,12 +20,14 @@ function startErrorMessage(error: Error): string {
 export function useAccrualImport() {
   const show = useToastStore((s) => s.show)
   const track = useBackgroundTasks((s) => s.track)
+  const userId = useSessionStore((s) => s.userId)
   const startMutation = useImportAccruals()
 
   function start(file: File, onStarted?: (jobId: string) => void) {
+    if (!userId) return
     startMutation.mutate(file, {
       onSuccess: ({ jobId }) => {
-        track({ id: jobId, kind: 'import', label: `Импорт ФНС: ${file.name}` })
+        track({ id: jobId, userId, kind: 'import', label: `Импорт ФНС: ${file.name}` })
         show('Импорт запущен — результат появится, когда файл обработается', 'info')
         onStarted?.(jobId)
       },

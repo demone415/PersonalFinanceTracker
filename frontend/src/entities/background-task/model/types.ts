@@ -47,6 +47,8 @@ export interface ImportSummary {
  */
 export interface TrackedTask {
   id: string
+  /** Id of the user who started the job — a task is only ever shown to its owner. */
+  userId: string
   kind: BgTaskKind
   /** Human label for the indicator/toast, e.g. «Экспорт CSV» / «Импорт ФНС». */
   label: string

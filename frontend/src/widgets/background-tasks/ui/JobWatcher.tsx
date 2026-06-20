@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   jobApi,
   useJobStatus,
@@ -29,6 +30,7 @@ export function JobWatcher({ task }: { task: TrackedTask }) {
   const update = useBackgroundTasks((s) => s.update)
   const remove = useBackgroundTasks((s) => s.remove)
   const show = useToastStore((s) => s.show)
+  const qc = useQueryClient()
   // Guards the side effects against the brief window between firing and the
   // store flipping `handled`, while this component is still mounted.
   const firedRef = useRef(false)
@@ -63,6 +65,10 @@ export function JobWatcher({ task }: { task: TrackedTask }) {
       void jobApi.downloadResult(task.id).catch(() => show('Не удалось скачать файл', 'error'))
       update(task.id, { handled: true })
     } else {
+      // An import creates new accruals/receipts, so refresh the lists and the
+      // dashboard aggregates regardless of which route the user is currently on.
+      void qc.invalidateQueries({ queryKey: ['accruals'] })
+      void qc.invalidateQueries({ queryKey: ['dashboard'] })
       void jobApi
         .getResultJson<ImportSummary>(task.id)
         .then((summary) => {
@@ -74,7 +80,7 @@ export function JobWatcher({ task }: { task: TrackedTask }) {
           show(`${task.label}: импорт завершён`, 'success')
         })
     }
-  }, [status, task, update, show])
+  }, [status, task, update, show, qc])
 
   return null
 }

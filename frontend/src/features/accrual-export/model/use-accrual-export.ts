@@ -1,5 +1,6 @@
 import { useExportAccruals, type AccrualFilter } from '@/entities/accrual'
 import { useBackgroundTasks } from '@/entities/background-task'
+import { useSessionStore } from '@/entities/session'
 import { useToastStore } from '@/shared/lib/toast'
 
 /**
@@ -12,12 +13,14 @@ import { useToastStore } from '@/shared/lib/toast'
 export function useAccrualExport() {
   const show = useToastStore((s) => s.show)
   const track = useBackgroundTasks((s) => s.track)
+  const userId = useSessionStore((s) => s.userId)
   const startMutation = useExportAccruals()
 
   function start(filter: AccrualFilter) {
+    if (!userId) return
     startMutation.mutate(filter, {
       onSuccess: ({ jobId }) => {
-        track({ id: jobId, kind: 'export', label: 'Экспорт CSV' })
+        track({ id: jobId, userId, kind: 'export', label: 'Экспорт CSV' })
         show('Экспорт запущен — файл скачается, когда будет готов', 'info')
       },
       onError: () => show('Не удалось запустить экспорт', 'error'),

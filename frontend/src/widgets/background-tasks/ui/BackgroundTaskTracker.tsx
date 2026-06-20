@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useSessionStore } from '@/entities/session'
-import { useBackgroundTasks, isTerminalStatus } from '@/entities/background-task'
+import { useBackgroundTasks, isTerminalStatus, tasksForUser } from '@/entities/background-task'
 import { JobWatcher } from './JobWatcher'
 
 /**
@@ -33,7 +33,11 @@ export function BackgroundTaskTracker() {
 
   if (status !== 'authenticated') return null
 
-  const watched = tasks.filter((t) => !isTerminalStatus(t.status) || !t.handled)
+  // Only ever watch the signed-in user's own jobs (the store is shared across
+  // users in one localStorage key).
+  const watched = tasksForUser(tasks, userId).filter(
+    (t) => !isTerminalStatus(t.status) || !t.handled,
+  )
 
   return (
     <>

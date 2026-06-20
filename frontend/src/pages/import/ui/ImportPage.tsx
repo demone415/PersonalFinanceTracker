@@ -39,6 +39,8 @@ export function ImportPage() {
   }
 
   const summary = task?.kind === 'import' ? task.summary : undefined
+  // Defensive: never let a missing/garbled summary blob crash the render.
+  const warnings = summary?.warnings ?? []
   const running = task != null && !isTerminalStatus(task.status)
 
   return (
@@ -131,13 +133,13 @@ export function ImportPage() {
                 <Stat label="Дубликаты" value={summary.receiptsSkippedDuplicate} />
                 <Stat label="С ошибками" value={summary.rowsFailed} />
               </dl>
-              {summary.warnings.length > 0 && (
+              {warnings.length > 0 && (
                 <details className="text-sm">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                    Предупреждения ({summary.warnings.length})
+                    Предупреждения ({warnings.length})
                   </summary>
                   <ul className="mt-2 max-h-48 space-y-1 overflow-auto rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-                    {summary.warnings.map((w, i) => (
+                    {warnings.map((w, i) => (
                       <li key={i}>{w}</li>
                     ))}
                   </ul>

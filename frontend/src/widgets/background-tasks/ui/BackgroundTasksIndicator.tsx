@@ -2,9 +2,11 @@ import { AlertCircle, CheckCircle2, Loader2, ListChecks, Trash2 } from 'lucide-r
 import {
   useBackgroundTasks,
   isTerminalStatus,
+  tasksForUser,
   type JobStatusValue,
   type TrackedTask,
 } from '@/entities/background-task'
+import { useSessionStore } from '@/entities/session'
 import { Button } from '@/shared/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import { cn } from '@/shared/lib/utils'
@@ -55,9 +57,12 @@ function TaskRow({ task }: { task: TrackedTask }) {
  * when there are no tasks. Independent of the current route.
  */
 export function BackgroundTasksIndicator() {
-  const tasks = useBackgroundTasks((s) => s.tasks)
+  const allTasks = useBackgroundTasks((s) => s.tasks)
   const clearFinished = useBackgroundTasks((s) => s.clearFinished)
+  const userId = useSessionStore((s) => s.userId)
 
+  // Only show the signed-in user's own jobs (the store is shared across users).
+  const tasks = tasksForUser(allTasks, userId)
   if (tasks.length === 0) return null
 
   const active = tasks.filter((t) => !isTerminalStatus(t.status))
