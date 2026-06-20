@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, FileSpreadsheet } from 'lucide-react'
 import { LucideIcon } from '@/shared/ui/lucide-icon'
 import {
   useAccruals,
@@ -86,6 +86,12 @@ export function AccrualsPage() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild title="Импорт чеков из выгрузки ФНС (.xlsx)">
+            <Link to="/import">
+              <FileSpreadsheet />
+              Импорт ФНС
+            </Link>
+          </Button>
           <ExportButton filter={filter} />
           {!showForm && (
             <Button onClick={() => setShowForm(true)}>+ Добавить</Button>

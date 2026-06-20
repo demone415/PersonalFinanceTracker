@@ -9,17 +9,17 @@ import { useAccrualExport } from '../model/use-accrual-export'
  * filters carry over so the export matches what the user is looking at.
  */
 export function ExportButton({ filter }: { filter: AccrualFilter }) {
-  const { start, isExporting } = useAccrualExport()
+  const { start, isStarting } = useAccrualExport()
 
   return (
     <Button
       variant="outline"
-      disabled={isExporting}
+      disabled={isStarting}
       onClick={() => start(filter)}
       title="Экспортировать текущий список в CSV"
     >
-      {isExporting ? <Loader2 className="animate-spin" /> : <Download />}
-      {isExporting ? 'Экспорт…' : 'Экспорт CSV'}
+      {isStarting ? <Loader2 className="animate-spin" /> : <Download />}
+      Экспорт CSV
     </Button>
   )
 }

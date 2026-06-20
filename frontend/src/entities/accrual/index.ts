@@ -27,6 +27,7 @@ export {
   useScanQr,
   useReceiptStatus,
   useExportAccruals,
+  useImportAccruals,
 } from './api/accrual-queries'
 
 export { isInflow } from './lib/direction'

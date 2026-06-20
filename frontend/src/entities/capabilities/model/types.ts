@@ -10,10 +10,9 @@ export interface Capabilities {
   /** QR scanning + receipt fetching — off when the provider token is not configured. */
   receiptScanning: boolean
   /**
-   * Import from the «Налоги ФЛ» export. Gated on the same provider-token flag as
-   * `receiptScanning` by product decision (the whole "receipts" area is shown as
-   * unavailable together), even though the import itself does not call the
-   * provider. Treat it as its own flag in the UI so it can be decoupled later.
+   * Import from the «Налоги ФЛ» Excel export. Always `true`: the import parses a
+   * user-supplied file and never calls the provider, so it does not depend on the
+   * provider token. Kept as its own flag so the UI can gate on it independently.
    */
   fnsImport: boolean
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, PieChart, ArrowLeftRight, Shapes, Target, History,
-  QrCode, Shield, LogOut, X, Wallet, Settings, type LucideIcon,
+  QrCode, Shield, LogOut, X, Wallet, Settings, FileSpreadsheet, type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/shared/api/supabase'
 import { useSessionStore } from '@/entities/session'
@@ -10,6 +10,7 @@ import { useCapabilities } from '@/entities/capabilities'
 import { cn } from '@/shared/lib/utils'
 import { ThemeToggle } from '@/shared/ui/theme-toggle'
 import { Button } from '@/shared/ui/button'
+import { BackgroundTasksIndicator } from '@/widgets/background-tasks'
 
 interface NavItem {
   to: string
@@ -97,6 +98,7 @@ export function AppShell() {
             Финансы
           </Link>
           <div className="flex items-center gap-1">
+            <BackgroundTasksIndicator />
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -111,6 +113,7 @@ export function AppShell() {
 
         {/* Desktop top bar */}
         <header className="hidden items-center justify-end gap-2 border-b px-6 py-2 md:flex">
+          <BackgroundTasksIndicator />
           <ThemeToggle />
         </header>
 
@@ -176,6 +179,7 @@ export function AppShell() {
             <SheetLink to="/dashboard" icon={PieChart} label="Аналитика" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/budgets" icon={Target} label="Бюджеты" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/journal" icon={History} label="Журнал" onClick={() => setMoreOpen(false)} />
+            <SheetLink to="/import" icon={FileSpreadsheet} label="Импорт ФНС" onClick={() => setMoreOpen(false)} />
             <SheetLink to="/settings" icon={Settings} label="Настройки" onClick={() => setMoreOpen(false)} />
             {isAdmin && (
               <SheetLink to="/admin" icon={Shield} label="Администрирование" onClick={() => setMoreOpen(false)} />

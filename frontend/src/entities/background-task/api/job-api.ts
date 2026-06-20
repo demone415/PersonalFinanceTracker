@@ -26,6 +26,26 @@ export const jobApi = {
   getStatus: (id: string) => http<JobStatus>(`/api/v1/jobs/${id}`),
 
   /**
+   * Fetches a finished job's result as parsed JSON (used by the FNS import, whose
+   * result is an `ImportSummary` rather than a downloadable file). Streams through
+   * the API with the Bearer token, like {@link jobApi.downloadResult}.
+   */
+  getResultJson: async <T>(id: string): Promise<T> => {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+
+    const response = await fetch(`${env.apiUrl}/api/v1/jobs/${id}/result`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+
+    if (!response.ok) {
+      throw new Error(`Result fetch failed: ${response.status} ${response.statusText}`)
+    }
+
+    return (await response.json()) as T
+  },
+
+  /**
    * Streams a finished job's result through the API (never a presigned URL) and
    * saves it to disk. Uses a raw `fetch` rather than the JSON `http` wrapper
    * because the response is a binary file, attaching the same Bearer token.
