@@ -22,6 +22,8 @@ public class ProfileServiceTests
     {
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
             ctx.SaveChangesAsync(cancellationToken);
+
+        public void DiscardChanges() => ctx.ChangeTracker.Clear();
     }
 
     private static AppDbContext NewContext(ICurrentUserService user, string dbName) =>

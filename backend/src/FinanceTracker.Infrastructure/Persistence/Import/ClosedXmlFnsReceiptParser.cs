@@ -30,7 +30,7 @@ public sealed partial class ClosedXmlFnsReceiptParser : IFnsReceiptParser
     private static readonly string[] DateFormats =
         ["dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy HH:mm", "dd.MM.yyyy"];
 
-    public IReadOnlyList<ParsedReceipt> Parse(Stream excel)
+    public FnsParseResult Parse(Stream excel)
     {
         XLWorkbook workbook;
         try
@@ -64,6 +64,8 @@ public sealed partial class ClosedXmlFnsReceiptParser : IFnsReceiptParser
 
             var ordered = new List<MutableReceipt>();
             var byKey = new Dictionary<string, MutableReceipt>(StringComparer.Ordinal);
+            var warnings = new List<string>();
+            var rowsFailed = 0;
 
             var lastRow = ws.LastRowUsed()!.RowNumber();
             for (var r = headerRow.RowNumber() + 1; r <= lastRow; r++)
@@ -72,11 +74,27 @@ public sealed partial class ClosedXmlFnsReceiptParser : IFnsReceiptParser
                 var number = Text(row.Cell(cNumber));
                 var goods = Text(row.Cell(cGoods));
 
-                // Skip fully-blank rows; a real line always has a receipt number.
+                // Skip fully-blank rows silently; a real line always has a receipt number.
                 if (number.Length == 0 && goods.Length == 0) continue;
-                if (number.Length == 0) continue;
 
-                var date = ParseDate(row.Cell(cDate));
+                // An item with no receipt number can't be grouped — report and skip it
+                // instead of dropping it silently.
+                if (number.Length == 0)
+                {
+                    warnings.Add($"Строка {r}: позиция «{Trunc(goods)}» без номера чека — пропущена.");
+                    rowsFailed++;
+                    continue;
+                }
+
+                // A row with an unreadable date can't be keyed (the date is part of the
+                // receipt identity) — report and skip it.
+                if (!TryParseDate(row.Cell(cDate), out var date))
+                {
+                    warnings.Add($"Строка {r}: неразборчивая дата чека «{Text(row.Cell(cDate))}» (чек {number}) — пропущена.");
+                    rowsFailed++;
+                    continue;
+                }
+
                 var (org, inn) = ParseSeller(cSeller > 0 ? Text(row.Cell(cSeller)) : "");
                 var key = $"{number}|{inn ?? ""}|{date.UtcDateTime:O}";
 
@@ -89,7 +107,7 @@ public sealed partial class ClosedXmlFnsReceiptParser : IFnsReceiptParser
                         Organization = org,
                         Address = cPlace > 0 ? NullIfBlank(Text(row.Cell(cPlace))) : null,
                         Date = date,
-                        Total = ParseDecimal(row.Cell(cTotal)),
+                        Total = ParseDecimal(row.Cell(cTotal), r, "Итого по чеку", number, warnings),
                         Description = cDesc > 0 ? NullIfBlank(Text(row.Cell(cDesc))) : null,
                         Category = cCat > 0 ? NullIfBlank(Text(row.Cell(cCat))) : null,
                     };
@@ -101,19 +119,23 @@ public sealed partial class ClosedXmlFnsReceiptParser : IFnsReceiptParser
                 {
                     receipt.Items.Add(new ParsedReceiptItem(
                         goods,
-                        ParseDecimal(row.Cell(cPrice)),
-                        ParseDecimal(row.Cell(cQty)),
-                        ParseDecimal(row.Cell(cSum))));
+                        ParseDecimal(row.Cell(cPrice), r, "Цена", number, warnings),
+                        ParseDecimal(row.Cell(cQty), r, "Количество", number, warnings),
+                        ParseDecimal(row.Cell(cSum), r, "Сумма по товару", number, warnings)));
                 }
             }
 
-            return ordered
+            var receipts = ordered
                 .Select(m => new ParsedReceipt(
                     m.ExternalNumber, m.Inn, m.Organization, m.Address, m.Date,
                     m.Total, m.Category, m.Description, m.Items))
                 .ToList();
+
+            return new FnsParseResult(receipts, warnings, rowsFailed);
         }
     }
+
+    private static string Trunc(string s) => s.Length <= 40 ? s : s[..40] + "…";
 
     private static Dictionary<string, int> MapColumns(IXLRow headerRow)
     {
@@ -130,27 +152,52 @@ public sealed partial class ClosedXmlFnsReceiptParser : IFnsReceiptParser
 
     private static string? NullIfBlank(string s) => s.Length == 0 ? null : s;
 
-    private static DateTimeOffset ParseDate(IXLCell cell)
+    // The FNS export carries no time-zone; the wall-clock value is local Moscow
+    // time. We label it UTC verbatim (no offset conversion) so imported receipts
+    // keep the exact timestamp shown in the export and the dedup key is stable.
+    // Consequence: an imported receipt's stored instant can differ by the MSK
+    // offset from a QR-scanned one — acceptable while imports are RU-only.
+    private static bool TryParseDate(IXLCell cell, out DateTimeOffset date)
     {
         if (cell.DataType == XLDataType.DateTime && cell.TryGetValue<DateTime>(out var dt))
-            return new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc));
+        {
+            date = new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc));
+            return true;
+        }
 
         var s = cell.GetString().Trim();
         foreach (var fmt in DateFormats)
             if (DateTime.TryParseExact(s, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var p))
-                return new DateTimeOffset(DateTime.SpecifyKind(p, DateTimeKind.Utc));
+            {
+                date = new DateTimeOffset(DateTime.SpecifyKind(p, DateTimeKind.Utc));
+                return true;
+            }
 
-        throw new FnsImportFormatException($"Неразборчивая дата чека: «{s}».");
+        date = default;
+        return false;
     }
 
-    private static decimal ParseDecimal(IXLCell cell)
+    /// <summary>
+    /// Reads a numeric cell, falling back to 0 when it is blank or unparseable. A
+    /// non-blank unparseable value is reported as a warning (rather than silently
+    /// becoming 0) so the user can see which amount we couldn't read.
+    /// </summary>
+    private static decimal ParseDecimal(
+        IXLCell cell, int rowNumber, string header, string receiptNumber, List<string> warnings)
     {
         if (cell.DataType == XLDataType.Number && cell.TryGetValue<double>(out var d))
             return (decimal)d;
 
-        var s = cell.GetString().Trim()
+        var raw = cell.GetString().Trim();
+        if (raw.Length == 0) return 0m;
+
+        var s = raw
             .Replace(" ", "").Replace(" ", "").Replace(',', '.');
-        return decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0m;
+        if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v))
+            return v;
+
+        warnings.Add($"Строка {rowNumber}: неразборчивое число в «{header}» «{raw}» (чек {receiptNumber}) — принято за 0.");
+        return 0m;
     }
 
     /// <summary>

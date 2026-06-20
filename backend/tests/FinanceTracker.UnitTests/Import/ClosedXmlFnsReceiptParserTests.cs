@@ -50,7 +50,7 @@ public class ClosedXmlFnsReceiptParserTests
             Row("29.01.2023 20:49", "24999", "ООО \"ДНС Ритейл\" 2540167061", "ТЦ Водный", "39",
                 "Электронная книга ONYX", "24999.00", "1", "24999.00"));
 
-        var receipts = new ClosedXmlFnsReceiptParser().Parse(stream);
+        var receipts = new ClosedXmlFnsReceiptParser().Parse(stream).Receipts;
 
         Assert.Equal(2, receipts.Count);
 
@@ -76,11 +76,54 @@ public class ClosedXmlFnsReceiptParserTests
             Row("01.04.2026 10:00", "100", "Магнит 7700000001", "А", "1", "Хлеб", "100", "1", "100"),
             Row("02.05.2026 11:00", "200", "Пятёрочка 7700000002", "Б", "1", "Молоко", "200", "1", "200"));
 
-        var receipts = new ClosedXmlFnsReceiptParser().Parse(stream);
+        var receipts = new ClosedXmlFnsReceiptParser().Parse(stream).Receipts;
 
         Assert.Equal(2, receipts.Count);
         Assert.All(receipts, r => Assert.Equal("1", r.ExternalNumber));
         Assert.Equal(["7700000001", "7700000002"], receipts.Select(r => r.Inn).Order());
+    }
+
+    [Fact]
+    public void UnparseableDateRow_IsSkipped_AndWarned()
+    {
+        using var stream = BuildWorkbook(
+            Row("не дата", "100", "Магнит 7700000001", "А", "1", "Хлеб", "100", "1", "100"),
+            Row("02.05.2026 11:00", "200", "Пятёрочка 7700000002", "Б", "2", "Молоко", "200", "1", "200"));
+
+        var result = new ClosedXmlFnsReceiptParser().Parse(stream);
+
+        // The bad-date row is dropped, the good one survives, and the problem is reported.
+        Assert.Single(result.Receipts);
+        Assert.Equal("2", result.Receipts[0].ExternalNumber);
+        Assert.Equal(1, result.RowsFailed);
+        Assert.Single(result.Warnings);
+        Assert.Contains("дата", result.Warnings[0]);
+    }
+
+    [Fact]
+    public void UnparseableAmount_BecomesZero_AndWarned()
+    {
+        using var stream = BuildWorkbook(
+            Row("01.04.2026 10:00", "сто", "Магнит 7700000001", "А", "1", "Хлеб", "100", "1", "100"));
+
+        var result = new ClosedXmlFnsReceiptParser().Parse(stream);
+
+        Assert.Single(result.Receipts);
+        Assert.Equal(0m, result.Receipts[0].Total); // unreadable «Итого по чеку» → 0
+        Assert.Contains(result.Warnings, w => w.Contains("Итого по чеку"));
+    }
+
+    [Fact]
+    public void ItemRowWithoutReceiptNumber_IsSkipped_AndWarned()
+    {
+        using var stream = BuildWorkbook(
+            Row("01.04.2026 10:00", "100", "Магнит 7700000001", "А", "", "Сиротливый товар", "100", "1", "100"));
+
+        var result = new ClosedXmlFnsReceiptParser().Parse(stream);
+
+        Assert.Empty(result.Receipts);
+        Assert.Equal(1, result.RowsFailed);
+        Assert.Single(result.Warnings);
     }
 
     [Fact]

@@ -87,11 +87,11 @@ public sealed class AccrualImportProcessor(
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        IReadOnlyList<ParsedReceipt> parsed;
+        FnsParseResult parseResult;
         try
         {
             await using var source = await fileStorage.OpenReadAsync(sourceObjectKey, cancellationToken);
-            parsed = parser.Parse(source);
+            parseResult = parser.Parse(source);
         }
         catch (FnsImportFormatException ex)
         {
@@ -107,12 +107,17 @@ public sealed class AccrualImportProcessor(
         }
         catch (Exception ex)
         {
-            return await HandleFailureAsync(task, ex, cancellationToken);
+            return await HandleFailureAsync(task.Id, ex, cancellationToken);
         }
 
         try
         {
-            var summary = await ImportAsync(task, parsed, cancellationToken);
+            // Stage the accruals/receipts (not yet saved) and the summary, then
+            // commit the data and mark the task Done in a single SaveChanges. The
+            // summary is uploaded first; if anything fails the data is never
+            // committed (see HandleFailureAsync), so a retry re-runs cleanly with
+            // accurate counts instead of seeing its own half-written rows.
+            var summary = await ImportAsync(task, parseResult, cancellationToken);
 
             var bytes = JsonSerializer.SerializeToUtf8Bytes(summary, SummaryJsonOptions);
             using (var stream = new MemoryStream(bytes, writable: false))
@@ -134,17 +139,19 @@ public sealed class AccrualImportProcessor(
         }
         catch (Exception ex)
         {
-            return await HandleFailureAsync(task, ex, cancellationToken);
+            return await HandleFailureAsync(task.Id, ex, cancellationToken);
         }
     }
 
     /// <summary>
-    /// Creates the accruals + receipts for the parsed workbook, skipping receipts
-    /// whose (ExternalNumber, INN, Date) already exist for the owner, and commits
-    /// once. Returns the counts for the stored summary.
+    /// Stages the accruals + receipts for the parsed workbook, skipping receipts
+    /// whose (ExternalNumber, INN, Date) already exist for the owner, and returns
+    /// the counts (plus the parser's per-row warnings) for the stored summary. The
+    /// entities are added to the context but <b>not</b> saved here — the caller
+    /// commits them together with the task completion in one SaveChanges.
     /// </summary>
     private async Task<ImportSummary> ImportAsync(
-        BackgroundTask task, IReadOnlyList<ParsedReceipt> parsed, CancellationToken cancellationToken)
+        BackgroundTask task, FnsParseResult parsed, CancellationToken cancellationToken)
     {
         var ownerId = task.UserId;
 
@@ -172,9 +179,8 @@ public sealed class AccrualImportProcessor(
 
         var imported = 0;
         var skipped = 0;
-        var warnings = new List<string>();
 
-        foreach (var pr in parsed)
+        foreach (var pr in parsed.Receipts)
         {
             var key = DedupKey(pr.ExternalNumber, pr.Inn, pr.Date);
             if (!seen.Add(key))
@@ -198,6 +204,12 @@ public sealed class AccrualImportProcessor(
                 : !string.IsNullOrWhiteSpace(pr.Organization) ? pr.Organization
                 : ImportDescriptionFallback;
 
+            // FNS receipts are always in rubles, so imported accruals are created as
+            // RUB with no exchange rate. NOTE: for a user whose base currency is not
+            // RUB this is not yet converted — the amount is recorded verbatim and
+            // (per the currency-aggregation contract) counted 1:1 in the base
+            // currency. Imports are RU-only for now; revisit if non-RUB base
+            // currencies must import FNS data correctly. See CLAUDE.md (FNS import).
             var accrual = new Accrual(
                 ownerId, pr.Total, pr.Date, AccrualType.Expense,
                 currency: "RUB", categoryId: categoryId, description: description, includeInStats: true);
@@ -208,15 +220,22 @@ public sealed class AccrualImportProcessor(
             imported++;
         }
 
-        task.ReportProgress(90);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new ImportSummary(parsed.Count, imported, skipped, RowsFailed: 0, warnings);
+        // Intentionally not saved here — see the method summary; ProcessAsync
+        // commits these staged entities together with the task completion.
+        return new ImportSummary(
+            parsed.Receipts.Count, imported, skipped, parsed.RowsFailed, parsed.Warnings);
     }
 
     private async Task<AccrualImportResult> HandleFailureAsync(
-        BackgroundTask task, Exception ex, CancellationToken cancellationToken)
+        Guid taskId, Exception ex, CancellationToken cancellationToken)
     {
+        // Drop any entities staged before the failure so recording the attempt can
+        // never flush a partial import, then reload the task to record on it.
+        unitOfWork.DiscardChanges();
+        var task = await db.BackgroundTasks
+            .IgnoreQueryFilters()
+            .FirstAsync(t => t.Id == taskId, cancellationToken);
+
         task.RecordAttempt();
         var delay = task.GetNextRetryDelay();
 

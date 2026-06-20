@@ -31,9 +31,9 @@ public class AccrualImportProcessorTests
         public override DateTimeOffset GetUtcNow() => now;
     }
 
-    private sealed class StubParser(Func<IReadOnlyList<ParsedReceipt>> factory) : IFnsReceiptParser
+    private sealed class StubParser(Func<FnsParseResult> factory) : IFnsReceiptParser
     {
-        public IReadOnlyList<ParsedReceipt> Parse(Stream excel) => factory();
+        public FnsParseResult Parse(Stream excel) => factory();
     }
 
     private sealed class FakeFileStorage : IFileStorage
@@ -69,6 +69,8 @@ public class AccrualImportProcessorTests
         public AppDbContext Db { get; }
         public FakeFileStorage Storage { get; } = new();
         public Func<IReadOnlyList<ParsedReceipt>> ParseResult { get; set; } = () => [];
+        public IReadOnlyList<string> ParseWarnings { get; set; } = [];
+        public int ParseRowsFailed { get; set; }
 
         public Harness(string dbName)
         {
@@ -85,8 +87,9 @@ public class AccrualImportProcessorTests
         }
 
         public AccrualImportProcessor Processor() => new(
-            Db, new UnitOfWork(Db), new StubParser(ParseResult), Storage,
-            new FixedTimeProvider(Now), NullLogger<AccrualImportProcessor>.Instance);
+            Db, new UnitOfWork(Db),
+            new StubParser(() => new FnsParseResult(ParseResult(), ParseWarnings, ParseRowsFailed)),
+            Storage, new FixedTimeProvider(Now), NullLogger<AccrualImportProcessor>.Instance);
 
         public BackgroundTask SeedTask(Guid userId)
         {
@@ -229,5 +232,27 @@ public class AccrualImportProcessorTests
         var saved = h.Reload(task.Id);
         Assert.Equal(BackgroundTaskStatus.Running, saved.Status);
         Assert.Equal(1, saved.Attempts);
+        // The summary upload fails after the entities are staged but before the
+        // single commit, so nothing is persisted — the retry re-runs with accurate
+        // counts instead of seeing its own half-written rows.
+        Assert.Empty(h.Db.Accruals.IgnoreQueryFilters().Where(a => a.UserId == Owner));
+        Assert.Empty(h.Db.Receipts.IgnoreQueryFilters().Where(r => r.UserId == Owner));
+    }
+
+    [Fact]
+    public async Task ParseWarnings_AreSurfacedInSummary()
+    {
+        var h = new Harness(nameof(ParseWarnings_AreSurfacedInSummary));
+        h.ParseResult = () => [MakeReceipt("39", "2540167061", Now, 100m)];
+        h.ParseWarnings = ["Строка 5: неразборчивая дата чека — пропущена."];
+        h.ParseRowsFailed = 1;
+        var task = h.SeedTask(Owner);
+
+        await h.Processor().ProcessAsync(task.Id, SourceKey);
+
+        var summary = h.ReadSummary(h.Reload(task.Id).ResultObjectKey);
+        Assert.Equal(1, summary.ReceiptsImported);
+        Assert.Equal(1, summary.RowsFailed);
+        Assert.Single(summary.Warnings);
     }
 }

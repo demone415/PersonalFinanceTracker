@@ -35,5 +35,14 @@ internal sealed class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
         // The dispatcher polls for due work: Pending receipts ordered by when the
         // next attempt is allowed. A composite index keeps that scan cheap.
         builder.HasIndex(r => new { r.FetchStatus, r.NextFetchAt });
+
+        // FNS-import dedup safety net: a receipt is unique per owner by
+        // (ExternalNumber, INN, Date). The processor dedups in-app, but this index
+        // also makes two concurrent import jobs unable to double-insert. Partial
+        // (WHERE ExternalNumber IS NOT NULL) so QR-scanned receipts — which have no
+        // ExternalNumber until fetched — are exempt and never collide.
+        builder.HasIndex(r => new { r.UserId, r.ExternalNumber, r.INN, r.Date })
+            .IsUnique()
+            .HasFilter("\"ExternalNumber\" IS NOT NULL");
     }
 }
