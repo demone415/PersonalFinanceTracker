@@ -18,6 +18,9 @@
 --   • receipts with line items for the "checkable" categories
 --     (Продукты, Кафе и рестораны, Одежда)
 --   • monthly budgets (7 categories) for both regular users across all six months
+--   • a "Create" journal entry (public.change_logs) for every accrual and budget,
+--     mirroring the ChangeLogInterceptor snapshot — raw SQL inserts don't run the
+--     EF interceptor, so the Журнал would otherwise be empty for seed data
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;          -- crypt() / gen_salt()
@@ -47,22 +50,70 @@ RETURNS text LANGUAGE sql AS $$
   SELECT p_arr[1 + floor(random() * array_length(p_arr, 1))::int];
 $$;
 
--- Insert one accrual.
+-- AccrualType int → enum name, mirroring how the ChangeLogInterceptor serializes
+-- the enum (by string name) so seed journal entries render like real ones.
+CREATE OR REPLACE FUNCTION pg_temp.type_name(p_type int)
+RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE p_type
+           WHEN 1 THEN 'Income' WHEN 2 THEN 'ReturnIncome'
+           WHEN 3 THEN 'Expense' WHEN 4 THEN 'ReturnExpense'
+           ELSE p_type::text END;
+$$;
+
+-- Write a "Create" journal row mirroring the ChangeLogInterceptor's snapshot
+-- (valuesAfter only). Every seeded accrual/budget gets one, since raw SQL inserts
+-- don't run the EF interceptor.
+CREATE OR REPLACE FUNCTION pg_temp.add_changelog(
+  p_user uuid, p_entity_type text, p_entity_id uuid, p_after jsonb, p_at timestamptz)
+RETURNS void LANGUAGE sql AS $$
+  INSERT INTO public.change_logs
+    ("Id","UserId","EntityType","EntityId","Action","Timestamp","ValuesBefore","ValuesAfter")
+  VALUES
+    (gen_random_uuid(), p_user, p_entity_type, p_entity_id, 'Create', p_at, NULL, p_after::text);
+$$;
+
+-- Insert one accrual + its journal entry. Returns the new accrual id so callers
+-- (e.g. receipt accruals) can enrich the journal snapshot with extra fields.
 CREATE OR REPLACE FUNCTION pg_temp.add_accrual(
   p_user uuid, p_amount numeric, p_date timestamptz, p_type int,
   p_cat uuid, p_desc text, p_currency text DEFAULT 'RUB',
-  p_rate numeric DEFAULT NULL, p_receipt uuid DEFAULT NULL)
-RETURNS void LANGUAGE sql AS $$
+  p_rate numeric DEFAULT NULL, p_receipt uuid DEFAULT NULL,
+  p_items jsonb DEFAULT NULL)
+RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE
+  v_id uuid := gen_random_uuid();
+  v_after jsonb;
+BEGIN
   INSERT INTO public.accruals
     ("Id","UserId","Amount","Date","Type","Currency","ExchangeRate",
      "CategoryId","Description","IncludeInStats","GroupId","ReceiptId","CreatedAt")
   VALUES
-    (gen_random_uuid(), p_user, p_amount, p_date, p_type, p_currency, p_rate,
+    (v_id, p_user, p_amount, p_date, p_type, p_currency, p_rate,
      p_cat, p_desc, true, NULL, p_receipt, now());
+
+  v_after := jsonb_build_object(
+    'Amount', p_amount,
+    'Date', p_date,
+    'Type', pg_temp.type_name(p_type),
+    'Currency', p_currency,
+    'ExchangeRate', p_rate,
+    'CategoryId', p_cat,
+    'Description', p_desc,
+    'IncludeInStats', true,
+    'Tags', '[]'::jsonb);
+  IF p_items IS NOT NULL THEN
+    v_after := v_after || jsonb_build_object('Items', p_items);
+  END IF;
+
+  PERFORM pg_temp.add_changelog(p_user, 'Accrual', v_id, v_after, p_date);
+  RETURN v_id;
+END;
 $$;
 
 -- Insert a receipt (Fetched) with N line items, then an accrual linked to it.
 -- The accrual amount equals the sum of the items, keeping aggregates consistent.
+-- The receipt's positions are folded into the accrual's journal snapshot, exactly
+-- as the interceptor does when a real receipt is fetched/imported.
 CREATE OR REPLACE FUNCTION pg_temp.add_receipt_accrual(
   p_user uuid, p_date timestamptz, p_cat uuid,
   p_org text, p_items text[],
@@ -76,6 +127,8 @@ DECLARE
   v_price numeric;
   v_qty   numeric;
   v_sum   numeric;
+  v_name  text;
+  v_lines jsonb := '[]'::jsonb;
   i int;
 BEGIN
   INSERT INTO public.receipts
@@ -88,8 +141,10 @@ BEGIN
                     ELSE round((1 + random() * (p_qty_max - 1))::numeric, 3) END;
     v_sum   := round(v_price * v_qty, 2);
     v_total := v_total + v_sum;
+    v_name  := pg_temp.pick(p_items);
     INSERT INTO public.receipt_items ("Id","ReceiptId","Name","Price","Quantity","Sum")
-    VALUES (gen_random_uuid(), v_receipt, pg_temp.pick(p_items), v_price, v_qty, v_sum);
+    VALUES (gen_random_uuid(), v_receipt, v_name, v_price, v_qty, v_sum);
+    v_lines := v_lines || jsonb_build_object('Name', v_name, 'Quantity', v_qty, 'Sum', v_sum);
   END LOOP;
 
   UPDATE public.receipts
@@ -97,7 +152,7 @@ BEGIN
    WHERE "Id" = v_receipt;
 
   PERFORM pg_temp.add_accrual(p_user, v_total, p_date, 3 /* Expense */, p_cat, p_org,
-                              'RUB', NULL, v_receipt);
+                              'RUB', NULL, v_receipt, v_lines);
 END;
 $$;
 
@@ -340,6 +395,20 @@ BEGIN
         (gen_random_uuid(), v_user, c_clothing,  v_y, v_m, round(12000 * f), 'RUB'),
         (gen_random_uuid(), v_user, c_edu,       v_y, v_m, round( 8000 * f), 'RUB'),
         (gen_random_uuid(), v_user, c_comms,     v_y, v_m, round( 1500 * f), 'RUB');
+
+      -- A "Create" journal entry per budget just inserted for this month.
+      INSERT INTO public.change_logs
+        ("Id","UserId","EntityType","EntityId","Action","Timestamp","ValuesBefore","ValuesAfter")
+      SELECT gen_random_uuid(), b."UserId", 'MonthlyBudget', b."Id", 'Create',
+             make_timestamptz(b."Year", b."Month", 1, 0, 0, 0), NULL,
+             jsonb_build_object(
+               'LimitAmount', b."LimitAmount",
+               'Year',        b."Year",
+               'Month',       b."Month",
+               'CategoryId',  b."CategoryId",
+               'Currency',    b."Currency")::text
+        FROM public.monthly_budgets b
+       WHERE b."UserId" = v_user AND b."Year" = v_y AND b."Month" = v_m;
     END LOOP;
   END LOOP;
 
