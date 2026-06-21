@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
 import { LoginPage } from '@/pages/login'
+import { RegisterPage } from '@/pages/register'
 import { AdminPage } from '@/pages/admin'
 import { CategoriesPage } from '@/pages/categories'
 import { BudgetsPage } from '@/pages/budgets'
@@ -19,6 +20,10 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
   },
   {
     element: <ProtectedRoute />,
