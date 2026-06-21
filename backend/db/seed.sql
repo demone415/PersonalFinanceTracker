@@ -10,8 +10,9 @@
 --
 -- Creates:
 --   • 3 login users (user@ / family@ / admin@, password "Password123!")
---   • 720 accruals total — 360 for each regular user, 60/month over the
---     6 months January … June 2026
+--   • ~720 accruals total — 60/month per regular user over the 6 months
+--     January … June 2026, plus a monthly salary (and a top-up "Премия" when
+--     needed) sized so every month ends with income > expenses
 --   • 14 distinct categories with data: all 12 system categories + 2 custom
 --     per user (Хобби, Питомцы)
 --   • receipts with line items for the "checkable" categories
@@ -181,13 +182,13 @@ DECLARE
   pets_desc        text[] := ARRAY['Корм для питомца','Ветклиника','Игрушки для питомца','Наполнитель','Груминг'];
 
   v_users   uuid[]    := ARRAY[u_ivan, u_anna];
-  v_salary  numeric[] := ARRAY[85000, 120000];
+  v_salary  numeric[] := ARRAY[180000, 220000];
   v_rent    numeric[] := ARRAY[35000, 50000];
   v_months  date[]    := ARRAY['2026-01-01','2026-02-01','2026-03-01',
                                '2026-04-01','2026-05-01','2026-06-01']::date[];
 
   ui int; v_user uuid; v_mon date; v_maxday int; v_y int; v_m int;
-  k int; f numeric;
+  k int; f numeric; v_expenses numeric; v_bonus numeric;
 BEGIN
   IF EXISTS (SELECT 1 FROM public.user_profiles) THEN
     RAISE NOTICE 'Seed: data already present — skipping.';
@@ -304,6 +305,23 @@ BEGIN
         PERFORM pg_temp.add_accrual(v_user, pg_temp.rnd(300, 3000),
           pg_temp.rand_day(v_mon, v_maxday), 3, c_pets, pg_temp.pick(pets_desc));
       END LOOP;
+
+      -- Keep every month in the black: sum this month's expenses (converted to
+      -- the base currency, mirroring Accrual.AmountInBaseCurrency) and, if the
+      -- base salary doesn't already clear them by ~10%, add a top-up "Премия"
+      -- income so net income > expenses for the month.
+      SELECT COALESCE(SUM("Amount" * COALESCE("ExchangeRate", 1)), 0)
+        INTO v_expenses
+        FROM public.accruals
+       WHERE "UserId" = v_user
+         AND "Type" = 3                       -- Expense
+         AND "Date" >= v_mon
+         AND "Date" <  (v_mon + interval '1 month');
+      v_bonus := round(v_expenses * 1.1) - v_salary[ui];
+      IF v_bonus > 0 THEN
+        PERFORM pg_temp.add_accrual(v_user, v_bonus,
+          pg_temp.rand_day(v_mon, v_maxday), 1 /* Income */, c_salary, 'Премия');
+      END IF;
     END LOOP;
 
     -- 3. Monthly budgets — all six months × 7 categories. Limits sit a bit
