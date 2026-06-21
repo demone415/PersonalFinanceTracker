@@ -45,8 +45,13 @@ export function JobWatcher({ task }: { task: TrackedTask }) {
     if (!status) return
 
     // Keep the store in sync so the indicator and the import page see live state.
-    if (status.status !== task.status || (status.error ?? undefined) !== task.error) {
-      update(task.id, { status: status.status, error: status.error })
+    // Normalise the backend's `null` error to `undefined` on *both* sides — the
+    // store holds `error?: string`, so writing the raw `null` while comparing the
+    // normalised value would never converge and would loop `update` forever
+    // (Maximum update depth exceeded → blank page).
+    const nextError = status.error ?? undefined
+    if (status.status !== task.status || nextError !== task.error) {
+      update(task.id, { status: status.status, error: nextError })
     }
 
     if (!isTerminalStatus(status.status)) return
