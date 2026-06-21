@@ -10,11 +10,14 @@
 --
 -- Creates:
 --   • 3 login users (user@ / family@ / admin@, password "Password123!")
---   • 300 accruals total — 150 for each regular user, ~50/month over
---     April / May / June 2026
+--   • ~720 accruals total — 60/month per regular user over the 6 months
+--     January … June 2026, plus a monthly salary (and a top-up "Премия" when
+--     needed) sized so every month ends with income > expenses
+--   • 14 distinct categories with data: all 12 system categories + 2 custom
+--     per user (Хобби, Питомцы)
 --   • receipts with line items for the "checkable" categories
 --     (Продукты, Кафе и рестораны, Одежда)
---   • monthly budgets for both regular users across all three months
+--   • monthly budgets (7 categories) for both regular users across all six months
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;          -- crypt() / gen_salt()
@@ -148,8 +151,15 @@ DECLARE
   c_enter     uuid := 'a1c00000-0000-7000-8000-000000000006';
   c_clothing  uuid := 'a1c00000-0000-7000-8000-000000000007';
   c_comms     uuid := 'a1c00000-0000-7000-8000-000000000008';
+  c_edu       uuid := 'a1c00000-0000-7000-8000-000000000009';
+  c_gifts     uuid := 'a1c00000-0000-7000-8000-00000000000a';
   c_salary    uuid := 'a1c00000-0000-7000-8000-00000000000b';
   c_other     uuid := 'a1c00000-0000-7000-8000-00000000000c';
+
+  -- Per-user custom categories (created in the user loop below) — push the
+  -- distinct-category count past the 12 system ones.
+  c_hobby uuid;
+  c_pets  uuid;
 
   -- Fixed user ids (enumerable, never secret — see CLAUDE.md)
   u_ivan  uuid := '11111111-1111-7111-8111-111111111111';
@@ -166,14 +176,19 @@ DECLARE
   transport_desc   text[] := ARRAY['Яндекс.Такси','Метро','Каршеринг','Автобус','Ситимобил','Электричка'];
   health_desc      text[] := ARRAY['Аптека','Клиника','Стоматология','Анализы','Очки / линзы','Массаж'];
   enter_desc       text[] := ARRAY['Кино','Концерт','Спортзал','Steam','Netflix','Зоопарк','Боулинг'];
+  edu_desc         text[] := ARRAY['Онлайн-курс','Книги','Вебинар','Учебники','Языковая школа','Подписка Coursera'];
+  gifts_desc       text[] := ARRAY['Подарок другу','Цветы','Сувенир','Подарочная карта','Подарок на день рождения'];
+  hobby_desc       text[] := ARRAY['Краски и кисти','Гитарные струны','Фотопечать','Настольная игра','Материалы для рукоделия'];
+  pets_desc        text[] := ARRAY['Корм для питомца','Ветклиника','Игрушки для питомца','Наполнитель','Груминг'];
 
   v_users   uuid[]    := ARRAY[u_ivan, u_anna];
-  v_salary  numeric[] := ARRAY[85000, 120000];
+  v_salary  numeric[] := ARRAY[180000, 220000];
   v_rent    numeric[] := ARRAY[35000, 50000];
-  v_months  date[]    := ARRAY['2026-04-01','2026-05-01','2026-06-01']::date[];
+  v_months  date[]    := ARRAY['2026-01-01','2026-02-01','2026-03-01',
+                               '2026-04-01','2026-05-01','2026-06-01']::date[];
 
   ui int; v_user uuid; v_mon date; v_maxday int; v_y int; v_m int;
-  k int; f numeric;
+  k int; f numeric; v_expenses numeric; v_bonus numeric;
 BEGIN
   IF EXISTS (SELECT 1 FROM public.user_profiles) THEN
     RAISE NOTICE 'Seed: data already present — skipping.';
@@ -191,12 +206,21 @@ BEGIN
     (u_anna,  'Анна Петрова',  'RUB', now(), now()),
     (u_admin, 'Администратор', 'RUB', now(), now());
 
-  -- 2. Accruals + receipts — 50 per user per month → 150/user, 300 total
+  -- 2. Accruals + receipts — 60 per user per month → 360/user, 720 total
   FOR ui IN 1..array_length(v_users, 1) LOOP
     v_user := v_users[ui];
 
+    -- Two user-owned categories per user (so the dataset spans 14 distinct
+    -- categories: 12 system + 2 custom).
+    c_hobby := gen_random_uuid();
+    c_pets  := gen_random_uuid();
+    INSERT INTO public.categories ("Id","UserId","Name","Icon","Color","IsSystem")
+    VALUES
+      (c_hobby, v_user, 'Хобби',    'palette', '#a855f7', false),
+      (c_pets,  v_user, 'Питомцы',  'paw-print', '#f59e0b', false);
+
     FOREACH v_mon IN ARRAY v_months LOOP
-      v_maxday := CASE WHEN v_mon = DATE '2026-06-01' THEN 19 ELSE 28 END;  -- today = 2026-06-19
+      v_maxday := CASE WHEN v_mon = DATE '2026-06-01' THEN 21 ELSE 28 END;  -- today = 2026-06-21
 
       -- Income (salary, day 4) + fixed monthly expenses
       PERFORM pg_temp.add_accrual(v_user, v_salary[ui],
@@ -257,9 +281,50 @@ BEGIN
         PERFORM pg_temp.add_accrual(v_user, pg_temp.rnd(200, 2500),
           pg_temp.rand_day(v_mon, v_maxday), 3, c_other, 'Разные расходы');
       END LOOP;
+
+      -- Education ×3
+      FOR k IN 1..3 LOOP
+        PERFORM pg_temp.add_accrual(v_user, pg_temp.rnd(1000, 8000),
+          pg_temp.rand_day(v_mon, v_maxday), 3, c_edu, pg_temp.pick(edu_desc));
+      END LOOP;
+
+      -- Gifts ×2
+      FOR k IN 1..2 LOOP
+        PERFORM pg_temp.add_accrual(v_user, pg_temp.rnd(500, 5000),
+          pg_temp.rand_day(v_mon, v_maxday), 3, c_gifts, pg_temp.pick(gifts_desc));
+      END LOOP;
+
+      -- Hobby ×3 (user category)
+      FOR k IN 1..3 LOOP
+        PERFORM pg_temp.add_accrual(v_user, pg_temp.rnd(400, 4000),
+          pg_temp.rand_day(v_mon, v_maxday), 3, c_hobby, pg_temp.pick(hobby_desc));
+      END LOOP;
+
+      -- Pets ×2 (user category)
+      FOR k IN 1..2 LOOP
+        PERFORM pg_temp.add_accrual(v_user, pg_temp.rnd(300, 3000),
+          pg_temp.rand_day(v_mon, v_maxday), 3, c_pets, pg_temp.pick(pets_desc));
+      END LOOP;
+
+      -- Keep every month in the black: sum this month's expenses (converted to
+      -- the base currency, mirroring Accrual.AmountInBaseCurrency) and, if the
+      -- base salary doesn't already clear them by ~10%, add a top-up "Премия"
+      -- income so net income > expenses for the month.
+      SELECT COALESCE(SUM("Amount" * COALESCE("ExchangeRate", 1)), 0)
+        INTO v_expenses
+        FROM public.accruals
+       WHERE "UserId" = v_user
+         AND "Type" = 3                       -- Expense
+         AND "Date" >= v_mon
+         AND "Date" <  (v_mon + interval '1 month');
+      v_bonus := round(v_expenses * 1.1) - v_salary[ui];
+      IF v_bonus > 0 THEN
+        PERFORM pg_temp.add_accrual(v_user, v_bonus,
+          pg_temp.rand_day(v_mon, v_maxday), 1 /* Income */, c_salary, 'Премия');
+      END IF;
     END LOOP;
 
-    -- 3. Monthly budgets — all three months × 6 categories. Limits sit a bit
+    -- 3. Monthly budgets — all six months × 7 categories. Limits sit a bit
     -- above typical monthly spend; scaled up for the higher-income user.
     f := CASE WHEN ui = 2 THEN 1.3 ELSE 1.0 END;
     FOREACH v_mon IN ARRAY v_months LOOP
@@ -273,9 +338,10 @@ BEGIN
         (gen_random_uuid(), v_user, c_transport, v_y, v_m, round(12000 * f), 'RUB'),
         (gen_random_uuid(), v_user, c_enter,     v_y, v_m, round( 9000 * f), 'RUB'),
         (gen_random_uuid(), v_user, c_clothing,  v_y, v_m, round(12000 * f), 'RUB'),
+        (gen_random_uuid(), v_user, c_edu,       v_y, v_m, round( 8000 * f), 'RUB'),
         (gen_random_uuid(), v_user, c_comms,     v_y, v_m, round( 1500 * f), 'RUB');
     END LOOP;
   END LOOP;
 
-  RAISE NOTICE 'Seed: done — 3 users, 300 accruals, receipts with items, budgets.';
+  RAISE NOTICE 'Seed: done — 3 users, 720 accruals over 6 months, 14 categories, budgets.';
 END $$;
